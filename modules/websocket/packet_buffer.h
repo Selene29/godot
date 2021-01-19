@@ -5,8 +5,8 @@
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)    */
+/* Copyright (c) 2007-2021 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2021 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -32,11 +32,10 @@
 #define PACKET_BUFFER_H
 
 #include "core/os/copymem.h"
-#include "core/ring_buffer.h"
+#include "core/templates/ring_buffer.h"
 
 template <class T>
 class PacketBuffer {
-
 private:
 	typedef struct {
 		uint32_t size;
@@ -50,7 +49,7 @@ public:
 	Error write_packet(const uint8_t *p_payload, uint32_t p_size, const T *p_info) {
 #ifdef TOOLS_ENABLED
 		// Verbose buffer warnings
-		if (p_payload && _payload.space_left() < p_size) {
+		if (p_payload && _payload.space_left() < (int32_t)p_size) {
 			ERR_PRINT("Buffer payload full! Dropping data.");
 			ERR_FAIL_V(ERR_OUT_OF_MEMORY);
 		}
@@ -59,11 +58,11 @@ public:
 			ERR_FAIL_V(ERR_OUT_OF_MEMORY);
 		}
 #else
-		ERR_FAIL_COND_V(p_payload && _payload.space_left() < p_size, ERR_OUT_OF_MEMORY);
+		ERR_FAIL_COND_V(p_payload && (uint32_t)_payload.space_left() < p_size, ERR_OUT_OF_MEMORY);
 		ERR_FAIL_COND_V(p_info && _packets.space_left() < 1, ERR_OUT_OF_MEMORY);
 #endif
 
-		// If p_info is NULL, only the payload is written
+		// If p_info is nullptr, only the payload is written
 		if (p_info) {
 			_Packet p;
 			p.size = p_size;
@@ -71,7 +70,7 @@ public:
 			_packets.write(p);
 		}
 
-		// If p_payload is NULL, only the packet information is written.
+		// If p_payload is nullptr, only the packet information is written.
 		if (p_payload) {
 			_payload.write((const uint8_t *)p_payload, p_size);
 		}
@@ -83,8 +82,8 @@ public:
 		ERR_FAIL_COND_V(_packets.data_left() < 1, ERR_UNAVAILABLE);
 		_Packet p;
 		_packets.read(&p, 1);
-		ERR_FAIL_COND_V(_payload.data_left() < p.size, ERR_BUG);
-		ERR_FAIL_COND_V(p_bytes < p.size, ERR_OUT_OF_MEMORY);
+		ERR_FAIL_COND_V(_payload.data_left() < (int)p.size, ERR_BUG);
+		ERR_FAIL_COND_V(p_bytes < (int)p.size, ERR_OUT_OF_MEMORY);
 
 		r_read = p.size;
 		copymem(r_info, &p.info, sizeof(T));

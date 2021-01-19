@@ -5,8 +5,8 @@
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)    */
+/* Copyright (c) 2007-2021 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2021 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -32,19 +32,22 @@
 #define GD_MONO_METHOD_H
 
 #include "gd_mono.h"
-#include "gd_mono_class_member.h"
 #include "gd_mono_header.h"
+#include "i_mono_class_member.h"
 
-class GDMonoMethod : public GDMonoClassMember {
-
+class GDMonoMethod : public IMonoClassMember {
 	StringName name;
 
-	int params_count;
+	uint16_t params_count;
+	unsigned int params_buffer_size = 0;
 	ManagedType return_type;
 	Vector<ManagedType> param_types;
 
-	bool attrs_fetched;
-	MonoCustomAttrInfo *attributes;
+	bool method_info_fetched = false;
+	MethodInfo method_info;
+
+	bool attrs_fetched = false;
+	MonoCustomAttrInfo *attributes = nullptr;
 
 	void _update_signature();
 	void _update_signature(MonoMethodSignature *p_method_sig);
@@ -54,26 +57,28 @@ class GDMonoMethod : public GDMonoClassMember {
 	MonoMethod *mono_method;
 
 public:
-	virtual MemberType get_member_type() { return MEMBER_TYPE_METHOD; }
+	virtual GDMonoClass *get_enclosing_class() const final;
 
-	virtual StringName get_name() { return name; }
+	virtual MemberType get_member_type() const final { return MEMBER_TYPE_METHOD; }
 
-	virtual bool is_static();
+	virtual StringName get_name() const final { return name; }
 
-	virtual Visibility get_visibility();
+	virtual bool is_static() final;
 
-	virtual bool has_attribute(GDMonoClass *p_attr_class);
-	virtual MonoObject *get_attribute(GDMonoClass *p_attr_class);
-	virtual void fetch_attributes();
+	virtual Visibility get_visibility() final;
 
-	_FORCE_INLINE_ int get_parameters_count() { return params_count; }
-	_FORCE_INLINE_ ManagedType get_return_type() { return return_type; }
+	virtual bool has_attribute(GDMonoClass *p_attr_class) final;
+	virtual MonoObject *get_attribute(GDMonoClass *p_attr_class) final;
+	void fetch_attributes();
 
-	void *get_thunk();
+	_FORCE_INLINE_ MonoMethod *get_mono_ptr() const { return mono_method; }
 
-	MonoObject *invoke(MonoObject *p_object, const Variant **p_params, MonoException **r_exc = NULL);
-	MonoObject *invoke(MonoObject *p_object, MonoException **r_exc = NULL);
-	MonoObject *invoke_raw(MonoObject *p_object, void **p_params, MonoException **r_exc = NULL);
+	_FORCE_INLINE_ uint16_t get_parameters_count() const { return params_count; }
+	_FORCE_INLINE_ ManagedType get_return_type() const { return return_type; }
+
+	MonoObject *invoke(MonoObject *p_object, const Variant **p_params, MonoException **r_exc = nullptr) const;
+	MonoObject *invoke(MonoObject *p_object, MonoException **r_exc = nullptr) const;
+	MonoObject *invoke_raw(MonoObject *p_object, void **p_params, MonoException **r_exc = nullptr) const;
 
 	String get_full_name(bool p_signature = false) const;
 	String get_full_name_no_class() const;
@@ -82,6 +87,8 @@ public:
 
 	void get_parameter_names(Vector<StringName> &names) const;
 	void get_parameter_types(Vector<ManagedType> &types) const;
+
+	const MethodInfo &get_method_info();
 
 	GDMonoMethod(StringName p_name, MonoMethod *p_method);
 	~GDMonoMethod();

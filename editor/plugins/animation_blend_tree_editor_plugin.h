@@ -5,8 +5,8 @@
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)    */
+/* Copyright (c) 2007-2021 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2021 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -40,17 +40,17 @@
 #include "scene/gui/graph_edit.h"
 #include "scene/gui/popup.h"
 #include "scene/gui/tree.h"
-/**
-	@author Juan Linietsky <reduzio@gmail.com>
-*/
+
+class ProgressBar;
 
 class AnimationNodeBlendTreeEditor : public AnimationTreeNodeEditorPlugin {
-
 	GDCLASS(AnimationNodeBlendTreeEditor, AnimationTreeNodeEditorPlugin);
 
 	Ref<AnimationNodeBlendTree> blend_tree;
 	GraphEdit *graph;
 	MenuButton *add_node;
+	Vector2 popup_menu_position;
+	bool use_popup_menu_position;
 
 	PanelContainer *error_panel;
 	Label *error_label;
@@ -70,9 +70,9 @@ class AnimationNodeBlendTreeEditor : public AnimationTreeNodeEditorPlugin {
 		String name;
 		String type;
 		Ref<Script> script;
-		AddOption(const String &p_name = String(), const String &p_type = String()) {
-			name = p_name;
-			type = p_type;
+		AddOption(const String &p_name = String(), const String &p_type = String()) :
+				name(p_name),
+				type(p_type) {
 		}
 	};
 
@@ -97,6 +97,8 @@ class AnimationNodeBlendTreeEditor : public AnimationTreeNodeEditorPlugin {
 	void _open_in_editor(const String &p_which);
 	void _anim_selected(int p_index, Array p_options, const String &p_node);
 	void _delete_request(const String &p_which);
+	void _delete_nodes_request();
+	void _popup_request(const Vector2 &p_position);
 
 	bool _update_filters(const Ref<AnimationNode> &anode);
 	void _edit_filters(const String &p_which);
@@ -104,7 +106,7 @@ class AnimationNodeBlendTreeEditor : public AnimationTreeNodeEditorPlugin {
 	void _filter_toggled();
 	Ref<AnimationNode> _filter_edit;
 
-	void _property_changed(const StringName &p_property, const Variant &p_value);
+	void _property_changed(const StringName &p_property, const Variant &p_value, const String &p_field, bool p_changing);
 	void _removed_from_graph();
 
 	EditorFileDialog *open_file;
@@ -127,10 +129,10 @@ public:
 	void add_custom_type(const String &p_name, const Ref<Script> &p_script);
 	void remove_custom_type(const Ref<Script> &p_script);
 
-	virtual Size2 get_minimum_size() const;
+	virtual Size2 get_minimum_size() const override;
 
-	virtual bool can_edit(const Ref<AnimationNode> &p_node);
-	virtual void edit(const Ref<AnimationNode> &p_node);
+	virtual bool can_edit(const Ref<AnimationNode> &p_node) override;
+	virtual void edit(const Ref<AnimationNode> &p_node) override;
 
 	AnimationNodeBlendTreeEditor();
 };

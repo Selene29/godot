@@ -5,8 +5,8 @@
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)    */
+/* Copyright (c) 2007-2021 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2021 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -36,26 +36,7 @@
 #include "scene/main/node.h"
 #include "scene/resources/texture.h"
 
-/* make previews for:
-*packdscene
-*wav
-*image
-*mesh
--font
-*script
-*material
--shader
--shader graph?
--navigation mesh
--collision?
--occluder polygon
--navigation polygon
--tileset
--curve and curve2D
-*/
-
 class EditorResourcePreviewGenerator : public Reference {
-
 	GDCLASS(EditorResourcePreviewGenerator, Reference);
 
 protected:
@@ -63,16 +44,16 @@ protected:
 
 public:
 	virtual bool handles(const String &p_type) const;
-	virtual Ref<Texture> generate(const RES &p_from, const Size2 p_size) const;
-	virtual Ref<Texture> generate_from_path(const String &p_path, const Size2 p_size) const;
+	virtual Ref<Texture2D> generate(const RES &p_from, const Size2 &p_size) const;
+	virtual Ref<Texture2D> generate_from_path(const String &p_path, const Size2 &p_size) const;
 
-	virtual bool should_generate_small_preview() const;
+	virtual bool generate_small_preview_automatically() const;
+	virtual bool can_generate_small_preview() const;
 
 	EditorResourcePreviewGenerator();
 };
 
 class EditorResourcePreview : public Node {
-
 	GDCLASS(EditorResourcePreview, Node);
 
 	static EditorResourcePreview *singleton;
@@ -87,30 +68,31 @@ class EditorResourcePreview : public Node {
 
 	List<QueueItem> queue;
 
-	Mutex *preview_mutex;
-	Semaphore *preview_sem;
+	Mutex preview_mutex;
+	Semaphore preview_sem;
 	Thread *thread;
-	bool exit;
+	volatile bool exit;
+	volatile bool exited;
 
 	struct Item {
-		Ref<Texture> preview;
-		Ref<Texture> small_preview;
-		int order;
-		uint32_t last_hash;
-		uint64_t modified_time;
+		Ref<Texture2D> preview;
+		Ref<Texture2D> small_preview;
+		int order = 0;
+		uint32_t last_hash = 0;
+		uint64_t modified_time = 0;
 	};
 
 	int order;
 
 	Map<String, Item> cache;
 
-	void _preview_ready(const String &p_str, const Ref<Texture> &p_texture, const Ref<Texture> &p_small_texture, ObjectID id, const StringName &p_func, const Variant &p_ud);
+	void _preview_ready(const String &p_str, const Ref<Texture2D> &p_texture, const Ref<Texture2D> &p_small_texture, ObjectID id, const StringName &p_func, const Variant &p_ud);
 	void _generate_preview(Ref<ImageTexture> &r_texture, Ref<ImageTexture> &r_small_texture, const QueueItem &p_item, const String &cache_base);
 
 	static void _thread_func(void *ud);
 	void _thread();
 
-	Vector<Ref<EditorResourcePreviewGenerator> > preview_generators;
+	Vector<Ref<EditorResourcePreviewGenerator>> preview_generators;
 
 protected:
 	static void _bind_methods();
@@ -118,13 +100,16 @@ protected:
 public:
 	static EditorResourcePreview *get_singleton();
 
-	//callback function is callback(String p_path,Ref<Texture> preview,Variant udata) preview null if could not load
+	//callback function is callback(String p_path,Ref<Texture2D> preview,Variant udata) preview null if could not load
 	void queue_resource_preview(const String &p_path, Object *p_receiver, const StringName &p_receiver_func, const Variant &p_userdata);
 	void queue_edited_resource_preview(const Ref<Resource> &p_res, Object *p_receiver, const StringName &p_receiver_func, const Variant &p_userdata);
 
 	void add_preview_generator(const Ref<EditorResourcePreviewGenerator> &p_generator);
 	void remove_preview_generator(const Ref<EditorResourcePreviewGenerator> &p_generator);
 	void check_for_invalidation(const String &p_path);
+
+	void start();
+	void stop();
 
 	EditorResourcePreview();
 	~EditorResourcePreview();

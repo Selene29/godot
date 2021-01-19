@@ -1,27 +1,55 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="MeshDataTool" inherits="Reference" category="Core" version="3.1">
+<class name="MeshDataTool" inherits="Reference" version="4.0">
 	<brief_description>
 		Helper tool to access and edit [Mesh] data.
 	</brief_description>
 	<description>
-		The MeshDataTool provides access to individual vertices in a [Mesh]. It allows users to read and edit vertex data of meshes. It also creates an array of faces and edges.
-		To use the MeshDataTool, load a mesh with [method create_from_surface]. When you are finished editing the data commit the data to a mesh with [method commit_to_surface].
-		Below is an example of how the MeshDataTool may be used.
-		[codeblock]
+		MeshDataTool provides access to individual vertices in a [Mesh]. It allows users to read and edit vertex data of meshes. It also creates an array of faces and edges.
+		To use MeshDataTool, load a mesh with [method create_from_surface]. When you are finished editing the data commit the data to a mesh with [method commit_to_surface].
+		Below is an example of how MeshDataTool may be used.
+		[codeblocks]
+		[gdscript]
+		var mesh = ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, BoxMesh.new().get_mesh_arrays())
 		var mdt = MeshDataTool.new()
 		mdt.create_from_surface(mesh, 0)
 		for i in range(mdt.get_vertex_count()):
-			var vertex = mdt.get_vertex(i)
-			...
-			mdt.set_vertex(i, vertex)
+		    var vertex = mdt.get_vertex(i)
+		    # In this example we extend the mesh by one unit, which results in seperated faces as it is flat shaded.
+		    vertex += mdt.get_vertex_normal(i)
+		    # Save your change.
+		    mdt.set_vertex(i, vertex)
 		mesh.surface_remove(0)
 		mdt.commit_to_surface(mesh)
-		[/codeblock]
+		var mi = MeshInstance.new()
+		mi.mesh = mesh
+		add_child(mi)
+		[/gdscript]
+		[csharp]
+		var mesh = new ArrayMesh();
+		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, new BoxMesh().GetMeshArrays());
+		var mdt = new MeshDataTool();
+		mdt.CreateFromSurface(mesh, 0);
+		for (var i = 0; i &lt; mdt.GetVertexCount(); i++)
+		{
+		    Vector3 vertex = mdt.GetVertex(i);
+		    // In this example we extend the mesh by one unit, which results in seperated faces as it is flat shaded.
+		    vertex += mdt.GetVertexNormal(i);
+		    // Save your change.
+		    mdt.SetVertex(i, vertex);
+		}
+		mesh.SurfaceRemove(0);
+		mdt.CommitToSurface(mesh);
+		var mi = new MeshInstance();
+		mi.Mesh = mesh;
+		AddChild(mi);
+		[/csharp]
+		[/codeblocks]
+		See also [ArrayMesh], [ImmediateGeometry3D] and [SurfaceTool] for procedural geometry generation.
+		[b]Note:[/b] Godot uses clockwise [url=https://learnopengl.com/Advanced-OpenGL/Face-culling]winding order[/url] for front faces of triangle primitive modes.
 	</description>
 	<tutorials>
 	</tutorials>
-	<demos>
-	</demos>
 	<methods>
 		<method name="clear">
 			<return type="void">
@@ -48,7 +76,7 @@
 			</argument>
 			<description>
 				Uses specified surface of given [Mesh] to populate data for MeshDataTool.
-				Requires [Mesh] with primitive type [code]PRIMITIVE_TRIANGLES[/code].
+				Requires [Mesh] with primitive type [constant Mesh.PRIMITIVE_TRIANGLES].
 			</description>
 		</method>
 		<method name="get_edge_count" qualifiers="const">
@@ -59,7 +87,7 @@
 			</description>
 		</method>
 		<method name="get_edge_faces" qualifiers="const">
-			<return type="PoolIntArray">
+			<return type="PackedInt32Array">
 			</return>
 			<argument index="0" name="idx" type="int">
 			</argument>
@@ -113,7 +141,7 @@
 			<argument index="0" name="idx" type="int">
 			</argument>
 			<description>
-				Returns meta data associated with given face.
+				Returns the metadata associated with the given face.
 			</description>
 		</method>
 		<method name="get_face_normal" qualifiers="const">
@@ -122,7 +150,7 @@
 			<argument index="0" name="idx" type="int">
 			</argument>
 			<description>
-				Calculates and returns face normal of given face.
+				Calculates and returns the face normal of the given face.
 			</description>
 		</method>
 		<method name="get_face_vertex" qualifiers="const">
@@ -133,7 +161,7 @@
 			<argument index="1" name="vertex" type="int">
 			</argument>
 			<description>
-				Returns specified vertex of given face.
+				Returns the specified vertex of the given face.
 				Vertex argument must be 2 or less because faces contain three vertices.
 			</description>
 		</method>
@@ -141,15 +169,15 @@
 			<return type="int">
 			</return>
 			<description>
-				Returns format of [Mesh]. Format is an integer made up of [Mesh] format flags combined together. For example, a mesh containing both vertices and normals would return a format of [code]3[/code] because [code]ARRAY_FORMAT_VERTEX[/code] is [code]1[/code] and [code]ARRAY_FORMAT_NORMAL[/code] is [code]2[/code].
-				For list of format flags see [ArrayMesh].
+				Returns the [Mesh]'s format. Format is an integer made up of [Mesh] format flags combined together. For example, a mesh containing both vertices and normals would return a format of [code]3[/code] because [constant Mesh.ARRAY_FORMAT_VERTEX] is [code]1[/code] and [constant Mesh.ARRAY_FORMAT_NORMAL] is [code]2[/code].
+				See [enum Mesh.ArrayFormat] for a list of format flags.
 			</description>
 		</method>
 		<method name="get_material" qualifiers="const">
 			<return type="Material">
 			</return>
 			<description>
-				Returns material assigned to the [Mesh].
+				Returns the material assigned to the [Mesh].
 			</description>
 		</method>
 		<method name="get_vertex" qualifiers="const">
@@ -162,7 +190,7 @@
 			</description>
 		</method>
 		<method name="get_vertex_bones" qualifiers="const">
-			<return type="PoolIntArray">
+			<return type="PackedInt32Array">
 			</return>
 			<argument index="0" name="idx" type="int">
 			</argument>
@@ -187,21 +215,21 @@
 			</description>
 		</method>
 		<method name="get_vertex_edges" qualifiers="const">
-			<return type="PoolIntArray">
+			<return type="PackedInt32Array">
 			</return>
 			<argument index="0" name="idx" type="int">
 			</argument>
 			<description>
-				Returns array of edges that share given vertex.
+				Returns an array of edges that share the given vertex.
 			</description>
 		</method>
 		<method name="get_vertex_faces" qualifiers="const">
-			<return type="PoolIntArray">
+			<return type="PackedInt32Array">
 			</return>
 			<argument index="0" name="idx" type="int">
 			</argument>
 			<description>
-				Returns array of faces that share given vertex.
+				Returns an array of faces that share the given vertex.
 			</description>
 		</method>
 		<method name="get_vertex_meta" qualifiers="const">
@@ -210,7 +238,7 @@
 			<argument index="0" name="idx" type="int">
 			</argument>
 			<description>
-				Returns meta data associated with given vertex.
+				Returns the metadata associated with the given vertex.
 			</description>
 		</method>
 		<method name="get_vertex_normal" qualifiers="const">
@@ -219,7 +247,7 @@
 			<argument index="0" name="idx" type="int">
 			</argument>
 			<description>
-				Returns normal of given vertex.
+				Returns the normal of the given vertex.
 			</description>
 		</method>
 		<method name="get_vertex_tangent" qualifiers="const">
@@ -228,7 +256,7 @@
 			<argument index="0" name="idx" type="int">
 			</argument>
 			<description>
-				Returns tangent of given vertex.
+				Returns the tangent of the given vertex.
 			</description>
 		</method>
 		<method name="get_vertex_uv" qualifiers="const">
@@ -237,7 +265,7 @@
 			<argument index="0" name="idx" type="int">
 			</argument>
 			<description>
-				Returns UV of given vertex.
+				Returns the UV of the given vertex.
 			</description>
 		</method>
 		<method name="get_vertex_uv2" qualifiers="const">
@@ -246,16 +274,16 @@
 			<argument index="0" name="idx" type="int">
 			</argument>
 			<description>
-				Returns UV2 of given vertex.
+				Returns the UV2 of the given vertex.
 			</description>
 		</method>
 		<method name="get_vertex_weights" qualifiers="const">
-			<return type="PoolRealArray">
+			<return type="PackedFloat32Array">
 			</return>
 			<argument index="0" name="idx" type="int">
 			</argument>
 			<description>
-				Returns bone weights of given vertex.
+				Returns bone weights of the given vertex.
 			</description>
 		</method>
 		<method name="set_edge_meta">
@@ -266,7 +294,7 @@
 			<argument index="1" name="meta" type="Variant">
 			</argument>
 			<description>
-				Sets the meta data of given edge.
+				Sets the metadata of the given edge.
 			</description>
 		</method>
 		<method name="set_face_meta">
@@ -277,7 +305,7 @@
 			<argument index="1" name="meta" type="Variant">
 			</argument>
 			<description>
-				Sets the meta data of given face.
+				Sets the metadata of the given face.
 			</description>
 		</method>
 		<method name="set_material">
@@ -286,7 +314,7 @@
 			<argument index="0" name="material" type="Material">
 			</argument>
 			<description>
-				Sets the material to be used by newly constructed [Mesh].
+				Sets the material to be used by newly-constructed [Mesh].
 			</description>
 		</method>
 		<method name="set_vertex">
@@ -297,7 +325,7 @@
 			<argument index="1" name="vertex" type="Vector3">
 			</argument>
 			<description>
-				Sets the position of given vertex.
+				Sets the position of the given vertex.
 			</description>
 		</method>
 		<method name="set_vertex_bones">
@@ -305,10 +333,10 @@
 			</return>
 			<argument index="0" name="idx" type="int">
 			</argument>
-			<argument index="1" name="bones" type="PoolIntArray">
+			<argument index="1" name="bones" type="PackedInt32Array">
 			</argument>
 			<description>
-				Sets the bones of given vertex.
+				Sets the bones of the given vertex.
 			</description>
 		</method>
 		<method name="set_vertex_color">
@@ -319,7 +347,7 @@
 			<argument index="1" name="color" type="Color">
 			</argument>
 			<description>
-				Sets the color of given vertex.
+				Sets the color of the given vertex.
 			</description>
 		</method>
 		<method name="set_vertex_meta">
@@ -330,7 +358,7 @@
 			<argument index="1" name="meta" type="Variant">
 			</argument>
 			<description>
-				Sets the meta data associated with given vertex.
+				Sets the metadata associated with the given vertex.
 			</description>
 		</method>
 		<method name="set_vertex_normal">
@@ -341,7 +369,7 @@
 			<argument index="1" name="normal" type="Vector3">
 			</argument>
 			<description>
-				Sets the normal of given vertex.
+				Sets the normal of the given vertex.
 			</description>
 		</method>
 		<method name="set_vertex_tangent">
@@ -352,7 +380,7 @@
 			<argument index="1" name="tangent" type="Plane">
 			</argument>
 			<description>
-				Sets the tangent of given vertex.
+				Sets the tangent of the given vertex.
 			</description>
 		</method>
 		<method name="set_vertex_uv">
@@ -363,7 +391,7 @@
 			<argument index="1" name="uv" type="Vector2">
 			</argument>
 			<description>
-				Sets the UV of given vertex.
+				Sets the UV of the given vertex.
 			</description>
 		</method>
 		<method name="set_vertex_uv2">
@@ -374,7 +402,7 @@
 			<argument index="1" name="uv2" type="Vector2">
 			</argument>
 			<description>
-				Sets the UV2 of given vertex.
+				Sets the UV2 of the given vertex.
 			</description>
 		</method>
 		<method name="set_vertex_weights">
@@ -382,10 +410,10 @@
 			</return>
 			<argument index="0" name="idx" type="int">
 			</argument>
-			<argument index="1" name="weights" type="PoolRealArray">
+			<argument index="1" name="weights" type="PackedFloat32Array">
 			</argument>
 			<description>
-				Sets the bone weights of given vertex.
+				Sets the bone weights of the given vertex.
 			</description>
 		</method>
 	</methods>

@@ -5,8 +5,8 @@
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)    */
+/* Copyright (c) 2007-2021 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2021 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -33,14 +33,14 @@
 
 #include "open_simplex_noise.h"
 
-#include "core/image.h"
-#include "core/reference.h"
+#include "core/io/image.h"
+#include "core/object/reference.h"
 #include "editor/editor_node.h"
 #include "editor/editor_plugin.h"
 #include "editor/property_editor.h"
 
-class NoiseTexture : public Texture {
-	GDCLASS(NoiseTexture, Texture)
+class NoiseTexture : public Texture2D {
+	GDCLASS(NoiseTexture, Texture2D);
 
 private:
 	Ref<Image> data;
@@ -51,13 +51,14 @@ private:
 	bool update_queued;
 	bool regen_queued;
 
-	RID texture;
+	mutable RID texture;
 	uint32_t flags;
 
 	Ref<OpenSimplexNoise> noise;
 	Vector2i size;
 	bool seamless;
-	bool as_normalmap;
+	bool as_normal_map;
+	float bump_strength;
 
 	void _thread_done(const Ref<Image> &p_image);
 	static void _thread_function(void *p_ud);
@@ -69,30 +70,31 @@ private:
 
 protected:
 	static void _bind_methods();
+	virtual void _validate_property(PropertyInfo &property) const override;
 
 public:
 	void set_noise(Ref<OpenSimplexNoise> p_noise);
 	Ref<OpenSimplexNoise> get_noise();
 
 	void set_width(int p_width);
-	void set_height(int p_hieght);
+	void set_height(int p_height);
 
 	void set_seamless(bool p_seamless);
 	bool get_seamless();
 
-	void set_as_normalmap(bool p_seamless);
-	bool is_normalmap();
+	void set_as_normal_map(bool p_as_normal_map);
+	bool is_normal_map();
 
-	int get_width() const;
-	int get_height() const;
+	void set_bump_strength(float p_bump_strength);
+	float get_bump_strength();
 
-	virtual void set_flags(uint32_t p_flags);
-	virtual uint32_t get_flags() const;
+	int get_width() const override;
+	int get_height() const override;
 
-	virtual RID get_rid() const { return texture; }
-	virtual bool has_alpha() const { return false; }
+	virtual RID get_rid() const override;
+	virtual bool has_alpha() const override { return false; }
 
-	virtual Ref<Image> get_data() const;
+	virtual Ref<Image> get_data() const override;
 
 	NoiseTexture();
 	virtual ~NoiseTexture();

@@ -5,8 +5,8 @@
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)    */
+/* Copyright (c) 2007-2021 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2021 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -38,12 +38,11 @@
 //#include <android_native_app_glue.h>
 
 class FileAccessAndroid : public FileAccess {
-
 	static FileAccess *create_android();
-	mutable AAsset *a;
-	mutable size_t len;
-	mutable size_t pos;
-	mutable bool eof;
+	mutable AAsset *a = nullptr;
+	mutable size_t len = 0;
+	mutable size_t pos = 0;
+	mutable bool eof = false;
 
 public:
 	static AAssetManager *asset_manager;
@@ -70,10 +69,11 @@ public:
 	virtual bool file_exists(const String &p_path); ///< return true if a file exists
 
 	virtual uint64_t _get_modified_time(const String &p_file) { return 0; }
+	virtual uint32_t _get_unix_permissions(const String &p_file) { return 0; }
+	virtual Error _set_unix_permissions(const String &p_file, uint32_t p_permissions) { return FAILED; }
 
 	//static void make_default();
 
-	FileAccessAndroid();
 	~FileAccessAndroid();
 };
 
