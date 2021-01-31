@@ -1,5 +1,5 @@
 /*************************************************************************/
-/*  camera_ios.h                                                         */
+/*  math_defs.h                                                          */
 /*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
@@ -28,18 +28,38 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
 
-#ifndef CAMERAIOS_H
-#define CAMERAIOS_H
+#ifndef GODOT_GDNATIVE_MATH_DEFS_H
+#define GODOT_GDNATIVE_MATH_DEFS_H
 
-#include "servers/camera_server.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-class CameraIOS : public CameraServer {
-private:
-public:
-	CameraIOS();
-	~CameraIOS();
+#include <stdint.h>
 
-	void update_feeds();
-};
+////// bool
 
-#endif /* CAMERAIOS_H */
+typedef bool godot_bool;
+
+#define GODOT_TRUE 1
+#define GODOT_FALSE 0
+
+/////// int
+
+typedef int64_t godot_int;
+
+/////// float
+
+typedef double godot_float;
+
+#ifdef REAL_T_IS_DOUBLE
+typedef double godot_real_t;
+#else
+typedef float godot_real_t;
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // GODOT_C_H

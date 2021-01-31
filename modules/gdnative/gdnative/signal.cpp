@@ -1,5 +1,5 @@
 /*************************************************************************/
-/*  camera_module.h                                                      */
+/*  signal.cpp                                                           */
 /*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
@@ -28,5 +28,26 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
 
-void register_camera_types();
-void unregister_camera_types();
+#include "gdnative/signal.h"
+
+#include "core/variant/callable.h"
+#include "core/variant/variant.h"
+
+static_assert(sizeof(godot_signal) == sizeof(Signal), "Signal size mismatch");
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void GDAPI godot_signal_new(godot_signal *p_self) {
+	memnew_placement(p_self, Signal);
+}
+
+void GDAPI godot_signal_destroy(godot_signal *p_self) {
+	Signal *self = (Signal *)p_self;
+	self->~Signal();
+}
+
+#ifdef __cplusplus
+}
+#endif
