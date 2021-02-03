@@ -4929,7 +4929,7 @@ void RendererSceneRenderRD::_debug_sdfgi_probes(RID p_render_buffers, RD::DrawLi
 	push_constant.band_power = 4;
 	push_constant.sections_in_band = ((band_points / 2) - 1);
 	push_constant.band_mask = band_points - 2;
-	push_constant.section_arc = (Math_PI * 2.0) / float(push_constant.sections_in_band);
+	push_constant.section_arc = Math_TAU / float(push_constant.sections_in_band);
 	push_constant.y_mult = rb->sdfgi->y_mult;
 
 	uint32_t total_points = push_constant.sections_in_band * band_points;
@@ -8785,6 +8785,14 @@ RendererSceneRenderRD::RendererSceneRenderRD(RendererStorageRD *p_storage) {
 		default_giprobe_buffer = RD::get_singleton()->uniform_buffer_create(sizeof(GI::GIProbeData) * RenderBuffers::MAX_GIPROBES);
 	}
 
+	{ //decals
+		cluster.max_decals = max_cluster_elements;
+		uint32_t decal_buffer_size = cluster.max_decals * sizeof(Cluster::DecalData);
+		cluster.decals = memnew_arr(Cluster::DecalData, cluster.max_decals);
+		cluster.decal_sort = memnew_arr(Cluster::InstanceSort<DecalInstance>, cluster.max_decals);
+		cluster.decal_buffer = RD::get_singleton()->storage_buffer_create(decal_buffer_size);
+	}
+
 	{ //reflections
 
 		cluster.max_reflections = max_cluster_elements;
@@ -8813,14 +8821,6 @@ RendererSceneRenderRD::RendererSceneRenderRD(RendererStorageRD *p_storage) {
 		uint32_t directional_light_buffer_size = cluster.max_directional_lights * sizeof(Cluster::DirectionalLightData);
 		cluster.directional_lights = memnew_arr(Cluster::DirectionalLightData, cluster.max_directional_lights);
 		cluster.directional_light_buffer = RD::get_singleton()->uniform_buffer_create(directional_light_buffer_size);
-	}
-
-	{ //decals
-		cluster.max_decals = max_cluster_elements;
-		uint32_t decal_buffer_size = cluster.max_decals * sizeof(Cluster::DecalData);
-		cluster.decals = memnew_arr(Cluster::DecalData, cluster.max_decals);
-		cluster.decal_sort = memnew_arr(Cluster::InstanceSort<DecalInstance>, cluster.max_decals);
-		cluster.decal_buffer = RD::get_singleton()->storage_buffer_create(decal_buffer_size);
 	}
 
 	if (!low_end) {
