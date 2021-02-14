@@ -158,7 +158,7 @@ float AnimationNode::blend_input(int p_input, float p_time, bool p_seek, float p
 	Ref<AnimationNode> node = blend_tree->get_node(node_name);
 
 	//inputs.write[p_input].last_pass = state->last_pass;
-	float activity = 0;
+	float activity = 0.0;
 	float ret = _blend_node(node_name, blend_tree->get_node_connection_array(node_name), nullptr, node, p_time, p_seek, p_blend, p_filter, p_optimize, &activity);
 
 	Vector<AnimationTree::Activity> *activity_ptr = state->tree->input_activity_map.getptr(base_path);
@@ -1394,7 +1394,7 @@ void AnimationTree::_update_properties() {
 
 	properties_dirty = false;
 
-	_change_notify();
+	notify_property_list_changed();
 }
 
 bool AnimationTree::_set(const StringName &p_name, const Variant &p_value) {
@@ -1404,9 +1404,6 @@ bool AnimationTree::_set(const StringName &p_name, const Variant &p_value) {
 
 	if (property_map.has(p_name)) {
 		property_map[p_name] = p_value;
-#ifdef TOOLS_ENABLED
-		_change_notify(p_name.operator String().utf8().get_data());
-#endif
 		return true;
 	}
 

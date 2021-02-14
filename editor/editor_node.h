@@ -312,6 +312,9 @@ private:
 
 	EditorSettingsDialog *settings_config_dialog;
 	ProjectSettingsEditor *project_settings;
+	bool settings_changed = true; //make it update settings on first frame
+	void _update_from_settings();
+
 	PopupMenu *vcs_actions_menu;
 	EditorFileDialog *file;
 	ExportTemplateManager *export_template_manager;
@@ -421,6 +424,9 @@ private:
 	VBoxContainer *bottom_panel_vb;
 	Label *version_label;
 	Button *bottom_panel_raise;
+
+	Tree *disk_changed_list;
+	ConfirmationDialog *disk_changed;
 
 	void _bottom_panel_raise_toggled(bool);
 
@@ -641,6 +647,10 @@ private:
 	static void _resource_loaded(RES p_resource, const String &p_path);
 
 	void _resources_changed(const Vector<String> &p_resources);
+	void _scan_external_changes();
+	void _reload_modified_scenes();
+	void _reload_project_settings();
+	void _resave_scenes(String p_str);
 
 	void _feature_profile_changed();
 	bool _is_class_editor_disabled_by_feature_profile(const StringName &p_class);
@@ -741,7 +751,7 @@ public:
 	void fix_dependencies(const String &p_for_file);
 	void clear_scene() { _cleanup_scene(); }
 	int new_scene();
-	Error load_scene(const String &p_scene, bool p_ignore_broken_deps = false, bool p_set_inherited = false, bool p_clear_errors = true, bool p_force_open_imported = false);
+	Error load_scene(const String &p_scene, bool p_ignore_broken_deps = false, bool p_set_inherited = false, bool p_clear_errors = true, bool p_force_open_imported = false, bool p_silent_change_tab = false);
 	Error load_resource(const String &p_resource, bool p_ignore_broken_deps = false);
 
 	bool is_scene_open(const String &p_path);
@@ -839,6 +849,8 @@ public:
 	void save_all_scenes();
 	void save_scene_list(Vector<String> p_scene_filenames);
 	void restart_editor();
+
+	void notify_settings_changed();
 
 	void dim_editor(bool p_dimming, bool p_force_dim = false);
 	bool is_editor_dimmed() const;

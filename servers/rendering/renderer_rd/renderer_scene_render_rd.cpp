@@ -667,6 +667,13 @@ void RendererSceneRenderRD::sdfgi_update(RID p_render_buffers, RID p_environment
 				u.ids.push_back(rb->sdfgi->lightprobe_texture);
 				uniforms.push_back(u);
 			}
+			{
+				RD::Uniform u;
+				u.binding = 11;
+				u.uniform_type = RD::UNIFORM_TYPE_TEXTURE;
+				u.ids.push_back(rb->sdfgi->occlusion_texture);
+				uniforms.push_back(u);
+			}
 
 			cascade.sdf_direct_light_uniform_set = RD::get_singleton()->uniform_set_create(uniforms, sdfgi_shader.direct_light.version_get_shader(sdfgi_shader.direct_light_shader, 0), 0);
 		}
@@ -949,7 +956,7 @@ void RendererSceneRenderRD::sdfgi_update(RID p_render_buffers, RID p_environment
 			sdfgi->cascades[i].integrate_uniform_set = RD::get_singleton()->uniform_set_create(uniforms, sdfgi_shader.integrate.version_get_shader(sdfgi_shader.integrate_shader, 0), 0);
 		}
 
-		sdfgi->uses_multibounce = env->sdfgi_use_multibounce;
+		sdfgi->bounce_feedback = env->sdfgi_bounce_feedback;
 		sdfgi->energy = env->sdfgi_energy;
 		sdfgi->normal_bias = env->sdfgi_normal_bias;
 		sdfgi->probe_bias = env->sdfgi_probe_bias;
@@ -962,7 +969,7 @@ void RendererSceneRenderRD::sdfgi_update(RID p_render_buffers, RID p_environment
 
 	//check for updates
 
-	sdfgi->uses_multibounce = env->sdfgi_use_multibounce;
+	sdfgi->bounce_feedback = env->sdfgi_bounce_feedback;
 	sdfgi->energy = env->sdfgi_energy;
 	sdfgi->normal_bias = env->sdfgi_normal_bias;
 	sdfgi->probe_bias = env->sdfgi_probe_bias;
@@ -1172,8 +1179,9 @@ void RendererSceneRenderRD::_sdfgi_update_light(RID p_render_buffers, RID p_envi
 	push_constant.grid_size[2] = rb->sdfgi->cascade_size;
 	push_constant.max_cascades = rb->sdfgi->cascades.size();
 	push_constant.probe_axis_size = rb->sdfgi->probe_axis_count;
-	push_constant.multibounce = rb->sdfgi->uses_multibounce;
+	push_constant.bounce_feedback = rb->sdfgi->bounce_feedback;
 	push_constant.y_mult = rb->sdfgi->y_mult;
+	push_constant.use_occlusion = rb->sdfgi->uses_occlusion;
 
 	for (uint32_t i = 0; i < rb->sdfgi->cascades.size(); i++) {
 		SDFGI::Cascade &cascade = rb->sdfgi->cascades[i];
@@ -1873,8 +1881,11 @@ void RendererSceneRenderRD::_process_gi(RID p_render_buffers, RID p_normal_rough
 	RD::get_singleton()->draw_command_end_label();
 }
 
-RID RendererSceneRenderRD::sky_create() {
-	return sky_owner.make_rid(Sky());
+RID RendererSceneRenderRD::sky_allocate() {
+	return sky_owner.allocate_rid();
+}
+void RendererSceneRenderRD::sky_initialize(RID p_rid) {
+	sky_owner.initialize_rid(p_rid, Sky());
 }
 
 void RendererSceneRenderRD::_sky_invalidate(Sky *p_sky) {
@@ -2898,8 +2909,11 @@ RendererStorageRD::MaterialData *RendererSceneRenderRD::_create_sky_material_fun
 	return material_data;
 }
 
-RID RendererSceneRenderRD::environment_create() {
-	return environment_owner.make_rid(Environment());
+RID RendererSceneRenderRD::environment_allocate() {
+	return environment_owner.allocate_rid();
+}
+void RendererSceneRenderRD::environment_initialize(RID p_rid) {
+	environment_owner.initialize_rid(p_rid, Environment());
 }
 
 void RendererSceneRenderRD::environment_set_background(RID p_env, RS::EnvironmentBG p_bg) {
@@ -3073,7 +3087,7 @@ void RendererSceneRenderRD::environment_glow_set_use_high_quality(bool p_enable)
 	glow_high_quality = p_enable;
 }
 
-void RendererSceneRenderRD::environment_set_sdfgi(RID p_env, bool p_enable, RS::EnvironmentSDFGICascades p_cascades, float p_min_cell_size, RS::EnvironmentSDFGIYScale p_y_scale, bool p_use_occlusion, bool p_use_multibounce, bool p_read_sky, float p_energy, float p_normal_bias, float p_probe_bias) {
+void RendererSceneRenderRD::environment_set_sdfgi(RID p_env, bool p_enable, RS::EnvironmentSDFGICascades p_cascades, float p_min_cell_size, RS::EnvironmentSDFGIYScale p_y_scale, bool p_use_occlusion, float p_bounce_feedback, bool p_read_sky, float p_energy, float p_normal_bias, float p_probe_bias) {
 	Environment *env = environment_owner.getornull(p_env);
 	ERR_FAIL_COND(!env);
 
@@ -3085,7 +3099,7 @@ void RendererSceneRenderRD::environment_set_sdfgi(RID p_env, bool p_enable, RS::
 	env->sdfgi_cascades = p_cascades;
 	env->sdfgi_min_cell_size = p_min_cell_size;
 	env->sdfgi_use_occlusion = p_use_occlusion;
-	env->sdfgi_use_multibounce = p_use_multibounce;
+	env->sdfgi_bounce_feedback = p_bounce_feedback;
 	env->sdfgi_read_sky_light = p_read_sky;
 	env->sdfgi_energy = p_energy;
 	env->sdfgi_normal_bias = p_normal_bias;
@@ -3983,8 +3997,11 @@ int RendererSceneRenderRD::get_directional_light_shadow_size(RID p_light_intance
 
 //////////////////////////////////////////////////
 
-RID RendererSceneRenderRD::camera_effects_create() {
-	return camera_effects_owner.make_rid(CameraEffects());
+RID RendererSceneRenderRD::camera_effects_allocate() {
+	return camera_effects_owner.allocate_rid();
+}
+void RendererSceneRenderRD::camera_effects_initialize(RID p_rid) {
+	camera_effects_owner.initialize_rid(p_rid, CameraEffects());
 }
 
 void RendererSceneRenderRD::camera_effects_set_dof_blur_quality(RS::DOFBlurQuality p_quality, bool p_use_jitter) {
@@ -7782,7 +7799,7 @@ void RendererSceneRenderRD::_render_sdfgi_region(RID p_render_buffers, int p_reg
 
 				RD::get_singleton()->compute_list_add_barrier(compute_list);
 
-				if (rb->sdfgi->uses_multibounce) {
+				if (rb->sdfgi->bounce_feedback > 0.0) {
 					//multibounce requires this to be stored so direct light can read from it
 
 					RD::get_singleton()->compute_list_bind_compute_pipeline(compute_list, sdfgi_shader.integrate_pipeline[SDGIShader::INTEGRATE_MODE_STORE]);
@@ -8120,8 +8137,9 @@ void RendererSceneRenderRD::_render_sdfgi_static_lights(RID p_render_buffers, ui
 	dl_push_constant.grid_size[2] = rb->sdfgi->cascade_size;
 	dl_push_constant.max_cascades = rb->sdfgi->cascades.size();
 	dl_push_constant.probe_axis_size = rb->sdfgi->probe_axis_count;
-	dl_push_constant.multibounce = false; // this is static light, do not multibounce yet
+	dl_push_constant.bounce_feedback = 0.0; // this is static light, do not multibounce yet
 	dl_push_constant.y_mult = rb->sdfgi->y_mult;
+	dl_push_constant.use_occlusion = rb->sdfgi->uses_occlusion;
 
 	//all must be processed
 	dl_push_constant.process_offset = 0;
@@ -8580,9 +8598,14 @@ RendererSceneRenderRD::RendererSceneRenderRD(RendererStorageRD *p_storage) {
 
 	{
 		// default material and shader for sky shader
-		sky_shader.default_shader = storage->shader_create();
+		sky_shader.default_shader = storage->shader_allocate();
+		storage->shader_initialize(sky_shader.default_shader);
+
 		storage->shader_set_code(sky_shader.default_shader, "shader_type sky; void fragment() { COLOR = vec3(0.0); } \n");
-		sky_shader.default_material = storage->material_create();
+
+		sky_shader.default_material = storage->material_allocate();
+		storage->material_initialize(sky_shader.default_material);
+
 		storage->material_set_shader(sky_shader.default_material, sky_shader.default_shader);
 
 		SkyMaterialData *md = (SkyMaterialData *)storage->material_get_data(sky_shader.default_material, RendererStorageRD::SHADER_TYPE_SKY);
@@ -8656,9 +8679,13 @@ RendererSceneRenderRD::RendererSceneRenderRD(RendererStorageRD *p_storage) {
 
 	{
 		// Need defaults for using fog with clear color
-		sky_scene_state.fog_shader = storage->shader_create();
+		sky_scene_state.fog_shader = storage->shader_allocate();
+		storage->shader_initialize(sky_scene_state.fog_shader);
+
 		storage->shader_set_code(sky_scene_state.fog_shader, "shader_type sky; uniform vec4 clear_color; void fragment() { COLOR = clear_color.rgb; } \n");
-		sky_scene_state.fog_material = storage->material_create();
+		sky_scene_state.fog_material = storage->material_allocate();
+		storage->material_initialize(sky_scene_state.fog_material);
+
 		storage->material_set_shader(sky_scene_state.fog_material, sky_scene_state.fog_shader);
 
 		Vector<RD::Uniform> uniforms;

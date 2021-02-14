@@ -73,7 +73,7 @@ void CPUParticles3D::set_amount(int p_amount) {
 	}
 
 	particle_data.resize((12 + 4 + 4) * p_amount);
-	RS::get_singleton()->multimesh_allocate(multimesh, p_amount, RS::MULTIMESH_TRANSFORM_3D, true, true);
+	RS::get_singleton()->multimesh_allocate_data(multimesh, p_amount, RS::MULTIMESH_TRANSFORM_3D, true, true);
 
 	particle_order.resize(p_amount);
 }
@@ -372,7 +372,7 @@ void CPUParticles3D::set_particle_flag(ParticleFlags p_particle_flag, bool p_ena
 	ERR_FAIL_INDEX(p_particle_flag, PARTICLE_FLAG_MAX);
 	particle_flags[p_particle_flag] = p_enable;
 	if (p_particle_flag == PARTICLE_FLAG_DISABLE_Z) {
-		_change_notify();
+		notify_property_list_changed();
 	}
 }
 
@@ -575,7 +575,7 @@ void CPUParticles3D::_particles_process(float p_delta) {
 		cycle++;
 		if (one_shot && cycle > 0) {
 			set_emitting(false);
-			_change_notify();
+			notify_property_list_changed();
 		}
 	}
 

@@ -337,6 +337,10 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	if (DisplayServer::get_singleton()->screen_get_dpi(screen) >= 192 && DisplayServer::get_singleton()->screen_get_size(screen).y >= 1400) {
 		// hiDPI display.
 		scale = 2.0;
+	} else if (DisplayServer::get_singleton()->screen_get_size(screen).y >= 1700) {
+		// Likely a hiDPI display, but we aren't certain due to the returned DPI.
+		// Use an intermediate scale to handle this situation.
+		scale = 1.5;
 	} else if (DisplayServer::get_singleton()->screen_get_size(screen).y <= 800) {
 		// Small loDPI display. Use a smaller display scale so that editor elements fit more easily.
 		// Icons won't look great, but this is better than having editor elements overflow from its window.
@@ -392,6 +396,8 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	hints["interface/theme/accent_color"] = PropertyInfo(Variant::COLOR, "interface/theme/accent_color", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT);
 	_initial_set("interface/theme/contrast", 0.25);
 	hints["interface/theme/contrast"] = PropertyInfo(Variant::FLOAT, "interface/theme/contrast", PROPERTY_HINT_RANGE, "0.01, 1, 0.01");
+	_initial_set("interface/theme/icon_saturation", 1.0);
+	hints["interface/theme/icon_saturation"] = PropertyInfo(Variant::FLOAT, "interface/theme/icon_saturation", PROPERTY_HINT_RANGE, "0,2,0.01", PROPERTY_USAGE_DEFAULT);
 	_initial_set("interface/theme/relationship_line_opacity", 0.1);
 	hints["interface/theme/relationship_line_opacity"] = PropertyInfo(Variant::FLOAT, "interface/theme/relationship_line_opacity", PROPERTY_HINT_RANGE, "0.00, 1, 0.01");
 	_initial_set("interface/theme/highlight_tabs", false);
@@ -441,7 +447,9 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	_initial_set("docks/filesystem/always_show_folders", true);
 
 	// Property editor
-	_initial_set("docks/property_editor/auto_refresh_interval", 0.3);
+	_initial_set("docks/property_editor/auto_refresh_interval", 0.2); //update 5 times per second by default
+	_initial_set("docks/property_editor/subresource_hue_tint", 0.75);
+	hints["docks/property_editor/subresource_hue_tint"] = PropertyInfo(Variant::FLOAT, "docks/property_editor/subresource_hue_tint", PROPERTY_HINT_RANGE, "0,1,0.01", PROPERTY_USAGE_DEFAULT);
 
 	/* Text editor */
 
