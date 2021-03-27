@@ -335,7 +335,7 @@ bool HTTPRequest::_update_connection() {
 
 				call_deferred("_request_done", RESULT_CHUNKED_BODY_SIZE_MISMATCH, response_code, response_headers, PackedByteArray());
 				return true;
-				// Request migh have been done
+				// Request might have been done
 			} else {
 				// Did not request yet, do request
 
@@ -387,6 +387,9 @@ bool HTTPRequest::_update_connection() {
 			}
 
 			client->poll();
+			if (client->get_status() != HTTPClient::STATUS_BODY) {
+				return false;
+			}
 
 			PackedByteArray chunk = client->read_response_body_chunk();
 			downloaded.add(chunk.size());
@@ -415,6 +418,7 @@ bool HTTPRequest::_update_connection() {
 			} else if (client->get_status() == HTTPClient::STATUS_DISCONNECTED) {
 				// We read till EOF, with no errors. Request is done.
 				call_deferred("_request_done", RESULT_SUCCESS, response_code, response_headers, body);
+				return true;
 			}
 
 			return false;

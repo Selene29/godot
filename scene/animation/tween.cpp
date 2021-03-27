@@ -869,8 +869,21 @@ void Tween::start() {
 		return;
 	}
 
+	pending_update++;
+	for (List<InterpolateData>::Element *E = interpolates.front(); E; E = E->next()) {
+		InterpolateData &data = E->get();
+		data.active = true;
+	}
+	pending_update--;
+
 	// We want to be activated
 	set_active(true);
+
+	// Don't resume from current position if stop_all() function has been used
+	if (was_stopped) {
+		seek(0);
+	}
+	was_stopped = false;
 }
 
 void Tween::reset(Object *p_object, StringName p_key) {
@@ -939,7 +952,7 @@ void Tween::stop(Object *p_object, StringName p_key) {
 void Tween::stop_all() {
 	// We no longer need to be active since all tweens have been stopped
 	set_active(false);
-
+	was_stopped = true;
 	// For each interpolation...
 	pending_update++;
 	for (List<InterpolateData>::Element *E = interpolates.front(); E; E = E->next()) {
@@ -1102,7 +1115,7 @@ real_t Tween::tell() const {
 
 	// For each interpolation...
 	for (const List<InterpolateData>::Element *E = interpolates.front(); E; E = E->next()) {
-		// Get the data and figure out if it's position is further along than the previous ones
+		// Get the data and figure out if its position is further along than the previous ones
 		const InterpolateData &data = E->get();
 		if (data.elapsed > pos) {
 			// Save it if so
@@ -1350,6 +1363,9 @@ void Tween::interpolate_property(Object *p_object, NodePath p_property, Variant 
 		return;
 	}
 
+	// Check that the target object is valid
+	ERR_FAIL_COND_MSG(p_object == nullptr, vformat("The Tween \"%s\"'s target node is `null`. Is the node reference correct?", get_name()));
+
 	// Get the property from the node path
 	p_property = p_property.get_as_property_path();
 
@@ -1377,6 +1393,9 @@ void Tween::interpolate_method(Object *p_object, StringName p_method, Variant p_
 		_add_pending_command("interpolate_method", p_object, p_method, p_initial_val, p_final_val, p_duration, p_trans_type, p_ease_type, p_delay);
 		return;
 	}
+
+	// Check that the target object is valid
+	ERR_FAIL_COND_MSG(p_object == nullptr, vformat("The Tween \"%s\"'s target node is `null`. Is the node reference correct?", get_name()));
 
 	// Convert any integers into REALs as they are better for interpolation
 	if (p_initial_val.get_type() == Variant::INT) {

@@ -434,8 +434,8 @@ const OrderedHashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 	default_builtin_cache.insert("ui_undo", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(KEY_Y | KEY_MASK_CMD));
 	inputs.push_back(InputEventKey::create_reference(KEY_Z | KEY_MASK_CMD | KEY_MASK_SHIFT));
+	inputs.push_back(InputEventKey::create_reference(KEY_Y | KEY_MASK_CMD));
 	default_builtin_cache.insert("ui_redo", inputs);
 
 	// ///// UI Text Input Shortcuts /////
@@ -567,6 +567,7 @@ const OrderedHashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 	inputs.push_back(InputEventKey::create_reference(KEY_E | KEY_MASK_CTRL));
 	inputs.push_back(InputEventKey::create_reference(KEY_RIGHT | KEY_MASK_CMD));
 	default_builtin_cache.insert("ui_text_caret_line_end.OSX", inputs);
+
 	// Text Caret Movement Page Up/Down
 
 	inputs = List<Ref<InputEvent>>();
@@ -694,7 +695,7 @@ void InputMap::load_default() {
 
 			// For the editor, only add keyboard actions.
 			if (iek.is_valid()) {
-				action_add_event(fullname, I->get());
+				action_add_event(name, I->get());
 			}
 		}
 	}

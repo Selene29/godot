@@ -1584,7 +1584,7 @@ void BaseMaterial3D::set_flag(Flags p_flag, bool p_enabled) {
 	}
 
 	flags[p_flag] = p_enabled;
-	if (p_flag == FLAG_USE_SHADOW_TO_OPACITY || p_flag == FLAG_USE_TEXTURE_REPEAT || p_flag == FLAG_SUBSURFACE_MODE_SKIN) {
+	if (p_flag == FLAG_USE_SHADOW_TO_OPACITY || p_flag == FLAG_USE_TEXTURE_REPEAT || p_flag == FLAG_SUBSURFACE_MODE_SKIN || p_flag == FLAG_USE_POINT_SIZE) {
 		notify_property_list_changed();
 	}
 	_queue_shader_change();
@@ -1650,7 +1650,7 @@ BaseMaterial3D::TextureFilter BaseMaterial3D::get_texture_filter() const {
 
 void BaseMaterial3D::_validate_feature(const String &text, Feature feature, PropertyInfo &property) const {
 	if (property.name.begins_with(text) && property.name != text + "_enabled" && !features[feature]) {
-		property.usage = 0;
+		property.usage = PROPERTY_USAGE_NOEDITOR;
 	}
 }
 
@@ -1683,19 +1683,27 @@ void BaseMaterial3D::_validate_property(PropertyInfo &property) const {
 		property.usage = 0;
 	}
 
-	if (property.name == "params_grow_amount" && !grow_enabled) {
-		property.usage = 0;
+	if (property.name == "billboard_keep_scale" && billboard_mode == BILLBOARD_DISABLED) {
+		property.usage = PROPERTY_USAGE_NOEDITOR;
+	}
+
+	if (property.name == "grow_amount" && !grow_enabled) {
+		property.usage = PROPERTY_USAGE_NOEDITOR;
+	}
+
+	if (property.name == "point_size" && !flags[FLAG_USE_POINT_SIZE]) {
+		property.usage = PROPERTY_USAGE_NOEDITOR;
 	}
 
 	if (property.name == "proximity_fade_distance" && !proximity_fade_enabled) {
-		property.usage = 0;
+		property.usage = PROPERTY_USAGE_NOEDITOR;
 	}
 
 	if ((property.name == "distance_fade_max_distance" || property.name == "distance_fade_min_distance") && distance_fade == DISTANCE_FADE_DISABLED) {
-		property.usage = 0;
+		property.usage = PROPERTY_USAGE_NOEDITOR;
 	}
 
-	// you can only enable anti-aliasing (in mataerials) on alpha scissor and alpha hash
+	// you can only enable anti-aliasing (in materials) on alpha scissor and alpha hash
 	const bool can_select_aa = (transparency == TRANSPARENCY_ALPHA_SCISSOR || transparency == TRANSPARENCY_ALPHA_HASH);
 	// alpha anti aliasiasing is only enabled when you can select aa
 	const bool alpha_aa_enabled = (alpha_antialiasing_mode != ALPHA_ANTIALIASING_OFF) && can_select_aa;
@@ -1714,7 +1722,7 @@ void BaseMaterial3D::_validate_property(PropertyInfo &property) const {
 		property.usage = 0;
 	}
 
-	// we cant choose an antialiasing mode if alpha isnt possible
+	// we can't choose an antialiasing mode if alpha isn't possible
 	if (property.name == "alpha_antialiasing_edge" && !alpha_aa_enabled) {
 		property.usage = 0;
 	}

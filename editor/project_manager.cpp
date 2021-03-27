@@ -487,7 +487,7 @@ private:
 					if (ProjectSettings::get_singleton()->save_custom(dir.plus_file("project.godot"), initial_settings, Vector<String>(), false) != OK) {
 						set_message(TTR("Couldn't create project.godot in project path."), MESSAGE_ERROR);
 					} else {
-						ResourceSaver::save(dir.plus_file("icon.png"), msg->get_theme_icon("DefaultProjectIcon", "EditorIcons"));
+						ResourceSaver::save(dir.plus_file("icon.png"), create_unscaled_default_project_icon());
 
 						FileAccess *f = FileAccess::open(dir.plus_file("default_env.tres"), FileAccess::WRITE);
 						if (!f) {
@@ -1741,7 +1741,7 @@ void ProjectList::_panel_input(const Ref<InputEvent> &p_ev, Node *p_hb) {
 	int clicked_index = p_hb->get_index();
 	const Item &clicked_project = _projects[clicked_index];
 
-	if (mb.is_valid() && mb->is_pressed() && mb->get_button_index() == BUTTON_LEFT) {
+	if (mb.is_valid() && mb->is_pressed() && mb->get_button_index() == MOUSE_BUTTON_LEFT) {
 		if (mb->get_shift() && _selected_project_keys.size() > 0 && _last_clicked != "" && clicked_project.project_key != _last_clicked) {
 			int anchor_index = -1;
 			for (int i = 0; i < _projects.size(); ++i) {
@@ -2425,8 +2425,10 @@ ProjectManager::ProjectManager() {
 		// Define a minimum window size to prevent UI elements from overlapping or being cut off
 		DisplayServer::get_singleton()->window_set_min_size(Size2(750, 420) * EDSCALE);
 
-		// TODO: Resize windows on hiDPI displays on Windows and Linux and remove the line below
-		DisplayServer::get_singleton()->window_set_size(DisplayServer::get_singleton()->window_get_size() * MAX(1, EDSCALE));
+		// TODO: Resize windows on hiDPI displays on Windows and Linux and remove the lines below
+		float scale_factor = MAX(1, EDSCALE);
+		Vector2i window_size = DisplayServer::get_singleton()->window_get_size();
+		DisplayServer::get_singleton()->window_set_size(Vector2i(window_size.x * scale_factor, window_size.y * scale_factor));
 	}
 
 	// TRANSLATORS: This refers to the application where users manage their Godot projects.

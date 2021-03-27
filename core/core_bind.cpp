@@ -276,6 +276,10 @@ String _OS::get_environment(const String &p_var) const {
 	return OS::get_singleton()->get_environment(p_var);
 }
 
+bool _OS::set_environment(const String &p_var, const String &p_value) const {
+	return OS::get_singleton()->set_environment(p_var, p_value);
+}
+
 String _OS::get_name() const {
 	return OS::get_singleton()->get_name();
 }
@@ -316,18 +320,6 @@ uint64_t _OS::get_static_memory_usage() const {
 
 uint64_t _OS::get_static_memory_peak_usage() const {
 	return OS::get_singleton()->get_static_memory_peak_usage();
-}
-
-int _OS::get_exit_code() const {
-	return OS::get_singleton()->get_exit_code();
-}
-
-void _OS::set_exit_code(int p_code) {
-	if (p_code < 0 || p_code > 125) {
-		WARN_PRINT("For portability reasons, the exit code should be set between 0 and 125 (inclusive).");
-	}
-
-	OS::get_singleton()->set_exit_code(p_code);
 }
 
 /**
@@ -381,6 +373,9 @@ Dictionary _OS::get_time(bool utc) const {
  * @return epoch calculated
  */
 int64_t _OS::get_unix_time_from_datetime(Dictionary datetime) const {
+	// if datetime is an empty Dictionary throws an error
+	ERR_FAIL_COND_V_MSG(datetime.is_empty(), 0, "Invalid datetime Dictionary: Dictionary is empty");
+
 	// Bunch of conversion constants
 	static const unsigned int SECONDS_PER_MINUTE = 60;
 	static const unsigned int MINUTES_PER_HOUR = 60;
@@ -574,7 +569,7 @@ struct _OSCoreBindImg {
 
 void _OS::print_all_textures_by_size() {
 	List<_OSCoreBindImg> imgs;
-	int total = 0;
+	uint64_t total = 0;
 	{
 		List<Ref<Resource>> rsrc;
 		ResourceCache::get_cached_resources(&rsrc);
@@ -711,8 +706,9 @@ void _OS::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("shell_open", "uri"), &_OS::shell_open);
 	ClassDB::bind_method(D_METHOD("get_process_id"), &_OS::get_process_id);
 
-	ClassDB::bind_method(D_METHOD("get_environment", "environment"), &_OS::get_environment);
-	ClassDB::bind_method(D_METHOD("has_environment", "environment"), &_OS::has_environment);
+	ClassDB::bind_method(D_METHOD("get_environment", "variable"), &_OS::get_environment);
+	ClassDB::bind_method(D_METHOD("set_environment", "variable", "value"), &_OS::set_environment);
+	ClassDB::bind_method(D_METHOD("has_environment", "variable"), &_OS::has_environment);
 
 	ClassDB::bind_method(D_METHOD("get_name"), &_OS::get_name);
 	ClassDB::bind_method(D_METHOD("get_cmdline_args"), &_OS::get_cmdline_args);
@@ -724,9 +720,6 @@ void _OS::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_unix_time"), &_OS::get_unix_time);
 	ClassDB::bind_method(D_METHOD("get_datetime_from_unix_time", "unix_time_val"), &_OS::get_datetime_from_unix_time);
 	ClassDB::bind_method(D_METHOD("get_unix_time_from_datetime", "datetime"), &_OS::get_unix_time_from_datetime);
-
-	ClassDB::bind_method(D_METHOD("get_exit_code"), &_OS::get_exit_code);
-	ClassDB::bind_method(D_METHOD("set_exit_code", "code"), &_OS::set_exit_code);
 
 	ClassDB::bind_method(D_METHOD("delay_usec", "usec"), &_OS::delay_usec);
 	ClassDB::bind_method(D_METHOD("delay_msec", "msec"), &_OS::delay_msec);
@@ -772,7 +765,6 @@ void _OS::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("request_permissions"), &_OS::request_permissions);
 	ClassDB::bind_method(D_METHOD("get_granted_permissions"), &_OS::get_granted_permissions);
 
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "exit_code"), "set_exit_code", "get_exit_code");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "low_processor_usage_mode"), "set_low_processor_usage_mode", "is_in_low_processor_usage_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "low_processor_usage_mode_sleep_usec"), "set_low_processor_usage_mode_sleep_usec", "get_low_processor_usage_mode_sleep_usec");
 
@@ -1385,9 +1377,9 @@ Vector<String> _File::get_csv_line(const String &p_delim) const {
 	return f->get_csv_line(p_delim);
 }
 
-/**< use this for files WRITTEN in _big_ endian machines (ie, amiga/mac)
+/**< use this for files WRITTEN in _big_ endian machines (i.e. amiga/mac)
  * It's not about the current CPU type but file formats.
- * this flags get reset to false (little endian) on each open
+ * These flags get reset to false (little endian) on each open
  */
 
 void _File::set_endian_swap(bool p_swap) {

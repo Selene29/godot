@@ -1764,7 +1764,7 @@ bool String::parse_utf8(const char *p_utf8, int p_len) {
 
 		if (skip) {
 			_UNICERROR("no space left");
-			return true; //not enough spac
+			return true; //not enough space
 		}
 	}
 
@@ -3888,25 +3888,55 @@ static _FORCE_INLINE_ int _xml_unescape(const char32_t *p_src, int p_src_len, ch
 
 			if (p_src_len >= 4 && p_src[1] == '#') {
 				char32_t c = 0;
-
-				for (int i = 2; i < p_src_len; i++) {
-					eat = i + 1;
-					char32_t ct = p_src[i];
-					if (ct == ';') {
-						break;
-					} else if (ct >= '0' && ct <= '9') {
-						ct = ct - '0';
-					} else if (ct >= 'a' && ct <= 'f') {
-						ct = (ct - 'a') + 10;
-					} else if (ct >= 'A' && ct <= 'F') {
-						ct = (ct - 'A') + 10;
-					} else {
-						continue;
+				bool overflow = false;
+				if (p_src[2] == 'x') {
+					// Hex entity &#x<num>;
+					for (int i = 3; i < p_src_len; i++) {
+						eat = i + 1;
+						char32_t ct = p_src[i];
+						if (ct == ';') {
+							break;
+						} else if (ct >= '0' && ct <= '9') {
+							ct = ct - '0';
+						} else if (ct >= 'a' && ct <= 'f') {
+							ct = (ct - 'a') + 10;
+						} else if (ct >= 'A' && ct <= 'F') {
+							ct = (ct - 'A') + 10;
+						} else {
+							break;
+						}
+						if (c > (UINT32_MAX >> 4)) {
+							overflow = true;
+							break;
+						}
+						c <<= 4;
+						c |= ct;
 					}
-					c <<= 4;
-					c |= ct;
+				} else {
+					// Decimal entity &#<num>;
+					for (int i = 2; i < p_src_len; i++) {
+						eat = i + 1;
+						char32_t ct = p_src[i];
+						if (ct == ';' || ct < '0' || ct > '9') {
+							break;
+						}
+					}
+					if (p_src[eat - 1] == ';') {
+						int64_t val = String::to_int(p_src + 2, eat - 3);
+						if (val > 0 && val <= UINT32_MAX) {
+							c = (char32_t)val;
+						} else {
+							overflow = true;
+						}
+					}
 				}
 
+				// Value must be non-zero, in the range of char32_t,
+				// actually end with ';'. If invalid, leave the entity as-is
+				if (c == '\0' || overflow || p_src[eat - 1] != ';') {
+					eat = 1;
+					c = *p_src;
+				}
 				if (p_dst) {
 					*p_dst = c;
 				}
@@ -4364,6 +4394,18 @@ String String::property_name_encode() const {
 	return *this;
 }
 
+// Changes made to the set of invalid characters must also be reflected in the String documentation.
+const String String::invalid_node_name_characters = ". : @ / \"";
+
+String String::validate_node_name() const {
+	Vector<String> chars = String::invalid_node_name_characters.split(" ");
+	String name = this->replace(chars[0], "");
+	for (int i = 1; i < chars.size(); i++) {
+		name = name.replace(chars[i], "");
+	}
+	return name;
+}
+
 String String::get_basename() const {
 	int pos = rfind(".");
 	if (pos < 0 || pos < MAX(rfind("/"), rfind("\\"))) {
@@ -4438,7 +4480,7 @@ String String::sprintf(const Array &values, bool *error) const {
 	for (; *self; self++) {
 		const char32_t c = *self;
 
-		if (in_format) { // We have % - lets see what else we get.
+		if (in_format) { // We have % - let's see what else we get.
 			switch (c) {
 				case '%': { // Replace %% with %
 					formatted += chr(c);

@@ -198,7 +198,11 @@ void EditorNode3DGizmo::add_mesh(const Ref<ArrayMesh> &p_mesh, bool p_billboard,
 }
 
 void EditorNode3DGizmo::add_lines(const Vector<Vector3> &p_lines, const Ref<Material> &p_material, bool p_billboard, const Color &p_modulate) {
-	if (p_lines.is_empty()) {
+	add_vertices(p_lines, p_material, Mesh::PRIMITIVE_LINES, p_billboard, p_modulate);
+}
+
+void EditorNode3DGizmo::add_vertices(const Vector<Vector3> &p_vertices, const Ref<Material> &p_material, Mesh::PrimitiveType p_primitive_type, bool p_billboard, const Color &p_modulate) {
+	if (p_vertices.is_empty()) {
 		return;
 	}
 
@@ -209,13 +213,13 @@ void EditorNode3DGizmo::add_lines(const Vector<Vector3> &p_lines, const Ref<Mate
 	Array a;
 	a.resize(Mesh::ARRAY_MAX);
 
-	a[Mesh::ARRAY_VERTEX] = p_lines;
+	a[Mesh::ARRAY_VERTEX] = p_vertices;
 
 	Vector<Color> color;
-	color.resize(p_lines.size());
+	color.resize(p_vertices.size());
 	{
 		Color *w = color.ptrw();
-		for (int i = 0; i < p_lines.size(); i++) {
+		for (int i = 0; i < p_vertices.size(); i++) {
 			if (is_selected()) {
 				w[i] = Color(1, 1, 1, 0.8) * p_modulate;
 			} else {
@@ -226,13 +230,13 @@ void EditorNode3DGizmo::add_lines(const Vector<Vector3> &p_lines, const Ref<Mate
 
 	a[Mesh::ARRAY_COLOR] = color;
 
-	mesh->add_surface_from_arrays(Mesh::PRIMITIVE_LINES, a);
+	mesh->add_surface_from_arrays(p_primitive_type, a);
 	mesh->surface_set_material(0, p_material);
 
 	if (p_billboard) {
 		float md = 0;
-		for (int i = 0; i < p_lines.size(); i++) {
-			md = MAX(0, p_lines[i].length());
+		for (int i = 0; i < p_vertices.size(); i++) {
+			md = MAX(0, p_vertices[i].length());
 		}
 		if (md) {
 			mesh->set_custom_aabb(AABB(Vector3(-md, -md, -md), Vector3(md, md, md) * 2.0));
@@ -1906,16 +1910,15 @@ void RayCast3DGizmoPlugin::redraw(EditorNode3DGizmo *p_gizmo) {
 
 	p_gizmo->clear();
 
-	Vector<Vector3> lines;
+	const Ref<StandardMaterial3D> material = raycast->is_enabled() ? raycast->get_debug_material() : get_material("shape_material_disabled");
 
-	lines.push_back(Vector3());
-	lines.push_back(raycast->get_target_position());
+	p_gizmo->add_lines(raycast->get_debug_line_vertices(), material);
 
-	const Ref<StandardMaterial3D> material =
-			get_material(raycast->is_enabled() ? "shape_material" : "shape_material_disabled", p_gizmo);
+	if (raycast->get_debug_shape_thickness() > 1) {
+		p_gizmo->add_vertices(raycast->get_debug_shape_vertices(), material, Mesh::PRIMITIVE_TRIANGLE_STRIP);
+	}
 
-	p_gizmo->add_lines(lines, material);
-	p_gizmo->add_collision_segments(lines);
+	p_gizmo->add_collision_segments(raycast->get_debug_line_vertices());
 }
 
 /////
@@ -2070,7 +2073,13 @@ void SoftBody3DGizmoPlugin::redraw(EditorNode3DGizmo *p_gizmo) {
 	Ref<TriangleMesh> tm = soft_body->get_mesh()->generate_triangle_mesh();
 
 	Vector<Vector3> points;
-	soft_body->get_mesh()->generate_debug_mesh_indices(points);
+	for (int i = 0; i < soft_body->get_mesh()->get_surface_count(); i++) {
+		Array arrays = soft_body->get_mesh()->surface_get_arrays(i);
+		ERR_CONTINUE(arrays.is_empty());
+
+		const Vector<Vector3> &vertices = arrays[Mesh::ARRAY_VERTEX];
+		points.append_array(vertices);
+	}
 
 	Ref<Material> material = get_material("shape_material", p_gizmo);
 
@@ -3501,6 +3510,57 @@ void LightmapProbeGizmoPlugin::redraw(EditorNode3DGizmo *p_gizmo) {
 	}
 
 	p_gizmo->add_lines(lines, material_lines);
+}
+
+////
+
+CollisionObject3DGizmoPlugin::CollisionObject3DGizmoPlugin() {
+	const Color gizmo_color = EDITOR_DEF("editors/3d_gizmos/gizmo_colors/shape", Color(0.5, 0.7, 1));
+	create_material("shape_material", gizmo_color);
+	const float gizmo_value = gizmo_color.get_v();
+	const Color gizmo_color_disabled = Color(gizmo_value, gizmo_value, gizmo_value, 0.65);
+	create_material("shape_material_disabled", gizmo_color_disabled);
+}
+
+bool CollisionObject3DGizmoPlugin::has_gizmo(Node3D *p_spatial) {
+	return Object::cast_to<CollisionObject3D>(p_spatial) != nullptr;
+}
+
+String CollisionObject3DGizmoPlugin::get_gizmo_name() const {
+	return "CollisionObject3D";
+}
+
+int CollisionObject3DGizmoPlugin::get_priority() const {
+	return -2;
+}
+
+void CollisionObject3DGizmoPlugin::redraw(EditorNode3DGizmo *p_gizmo) {
+	CollisionObject3D *co = Object::cast_to<CollisionObject3D>(p_gizmo->get_spatial_node());
+
+	p_gizmo->clear();
+
+	List<uint32_t> owners;
+	co->get_shape_owners(&owners);
+	for (List<uint32_t>::Element *E = owners.front(); E; E = E->next()) {
+		uint32_t owner_id = E->get();
+		Transform xform = co->shape_owner_get_transform(owner_id);
+		Object *owner = co->shape_owner_get_owner(owner_id);
+		// Exclude CollisionShape3D and CollisionPolygon3D as they have their gizmo.
+		if (!Object::cast_to<CollisionShape3D>(owner) && !Object::cast_to<CollisionPolygon3D>(owner)) {
+			Ref<Material> material = get_material(!co->is_shape_owner_disabled(owner_id) ? "shape_material" : "shape_material_disabled", p_gizmo);
+			for (int shape_id = 0; shape_id < co->shape_owner_get_shape_count(owner_id); shape_id++) {
+				Ref<Shape3D> s = co->shape_owner_get_shape(owner_id, shape_id);
+				if (s.is_null()) {
+					continue;
+				}
+				SurfaceTool st;
+				st.append_from(s->get_debug_mesh(), 0, xform);
+
+				p_gizmo->add_mesh(st.commit(), false, Ref<SkinReference>(), material);
+				p_gizmo->add_collision_segments(s->get_debug_mesh_lines());
+			}
+		}
+	}
 }
 
 ////

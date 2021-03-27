@@ -1166,6 +1166,52 @@ TEST_CASE("[String] xml_escape/unescape") {
 	CHECK(s.xml_escape(false).xml_unescape() == s);
 }
 
+TEST_CASE("[String] xml_unescape") {
+	// Named entities
+	String input = "&quot;&amp;&apos;&lt;&gt;";
+	CHECK(input.xml_unescape() == "\"&\'<>");
+
+	// Numeric entities
+	input = "&#x41;&#66;";
+	CHECK(input.xml_unescape() == "AB");
+
+	input = "&#0;&x#0;More text";
+	String result = input.xml_unescape();
+	// Didn't put in a leading NUL and terminate the string
+	CHECK(input.length() > 0);
+	CHECK(input[0] != '\0');
+	// Entity should be left as-is if invalid
+	CHECK(input.xml_unescape() == input);
+
+	// Check near char32_t range
+	input = "&#xFFFFFFFF;";
+	result = input.xml_unescape();
+	CHECK(result.length() == 1);
+	CHECK(result[0] == 0xFFFFFFFF);
+	input = "&#4294967295;";
+	result = input.xml_unescape();
+	CHECK(result.length() == 1);
+	CHECK(result[0] == 0xFFFFFFFF);
+
+	// Check out of range of char32_t
+	input = "&#xFFFFFFFFF;";
+	CHECK(input.xml_unescape() == input);
+	input = "&#4294967296;";
+	CHECK(input.xml_unescape() == input);
+
+	// Shouldn't consume without ending in a ';'
+	input = "&#66";
+	CHECK(input.xml_unescape() == input);
+	input = "&#x41";
+	CHECK(input.xml_unescape() == input);
+
+	// Invalid characters should make the entity ignored
+	input = "&#x41SomeIrrelevantText;";
+	CHECK(input.xml_unescape() == input);
+	input = "&#66SomeIrrelevantText;";
+	CHECK(input.xml_unescape() == input);
+}
+
 TEST_CASE("[String] Strip escapes") {
 	String s = "\t\tTest Test\r\n Test";
 	CHECK(s.strip_escapes() == "Test Test Test");
@@ -1271,6 +1317,20 @@ TEST_CASE("[String] humanize_size") {
 	CHECK(String::humanize_size(1025300) == "1001.2 KiB");
 	CHECK(String::humanize_size(100523550) == "95.86 MiB");
 	CHECK(String::humanize_size(5345555000) == "4.97 GiB");
+}
+
+TEST_CASE("[String] validate_node_name") {
+	String numeric_only = "12345";
+	CHECK(numeric_only.validate_node_name() == "12345");
+
+	String name_with_spaces = "Name with spaces";
+	CHECK(name_with_spaces.validate_node_name() == "Name with spaces");
+
+	String name_with_kana = "Name with kana ゴドツ";
+	CHECK(name_with_kana.validate_node_name() == "Name with kana ゴドツ");
+
+	String name_with_invalid_chars = "Name with invalid characters :.@removed!";
+	CHECK(name_with_invalid_chars.validate_node_name() == "Name with invalid characters removed!");
 }
 } // namespace TestString
 

@@ -395,6 +395,8 @@ Error Main::test_setup() {
 	GLOBAL_DEF("debug/settings/crash_handler/message",
 			String("Please include this when reporting the bug on https://github.com/godotengine/godot/issues"));
 
+	translation_server = memnew(TranslationServer);
+
 	// From `Main::setup2()`.
 	preregister_module_types();
 	preregister_server_types();
@@ -402,6 +404,16 @@ Error Main::test_setup() {
 	register_core_singletons();
 
 	register_server_types();
+
+	translation_server->setup(); //register translations, load them, etc.
+	if (locale != "") {
+		translation_server->set_locale(locale);
+	}
+	translation_server->load_translations();
+	ResourceLoader::load_translation_remaps(); //load remaps for resources
+
+	ResourceLoader::load_path_remaps();
+
 	register_scene_types();
 
 #ifdef TOOLS_ENABLED
@@ -441,6 +453,9 @@ void Main::test_cleanup() {
 
 	OS::get_singleton()->finalize();
 
+	if (translation_server) {
+		memdelete(translation_server);
+	}
 	if (globals) {
 		memdelete(globals);
 	}
@@ -514,7 +529,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	input_map = memnew(InputMap);
 	globals = memnew(ProjectSettings);
 
-	register_core_settings(); //here globals is present
+	register_core_settings(); //here globals are present
 
 	translation_server = memnew(TranslationServer);
 	performance = memnew(Performance);
@@ -523,8 +538,8 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 	// Only flush stdout in debug builds by default, as spamming `print()` will
 	// decrease performance if this is enabled.
-	GLOBAL_DEF("application/run/flush_stdout_on_print", false);
-	GLOBAL_DEF("application/run/flush_stdout_on_print.debug", true);
+	GLOBAL_DEF_RST("application/run/flush_stdout_on_print", false);
+	GLOBAL_DEF_RST("application/run/flush_stdout_on_print.debug", true);
 
 	GLOBAL_DEF("debug/settings/crash_handler/message",
 			String("Please include this when reporting the bug on https://github.com/godotengine/godot/issues"));
@@ -1159,6 +1174,8 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 		_print_line_enabled = false;
 	}
 
+	Logger::set_flush_stdout_on_print(ProjectSettings::get_singleton()->get("application/run/flush_stdout_on_print"));
+
 	OS::get_singleton()->set_cmdline(execpath, main_args);
 
 	GLOBAL_DEF("rendering/driver/driver_name", "Vulkan");
@@ -1500,7 +1517,7 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 
 	input = memnew(Input);
 
-	/* Iniitalize Display Server */
+	/* Initialize Display Server */
 
 	{
 		String rendering_driver; // temp broken
@@ -1530,12 +1547,12 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 		display_server->screen_set_orientation(window_orientation);
 	}
 
-	/* Initialize Pen Table Driver */
+	/* Initialize Pen Tablet Driver */
 
 	{
 		GLOBAL_DEF_RST_NOVAL("input_devices/pen_tablet/driver", "");
-		GLOBAL_DEF_RST_NOVAL("input_devices/pen_tablet/driver.windows", "");
-		ProjectSettings::get_singleton()->set_custom_property_info("input_devices/pen_tablet/driver.windows", PropertyInfo(Variant::STRING, "input_devices/pen_tablet/driver.windows", PROPERTY_HINT_ENUM, "wintab,winink"));
+		GLOBAL_DEF_RST_NOVAL("input_devices/pen_tablet/driver.Windows", "");
+		ProjectSettings::get_singleton()->set_custom_property_info("input_devices/pen_tablet/driver.Windows", PropertyInfo(Variant::STRING, "input_devices/pen_tablet/driver.Windows", PROPERTY_HINT_ENUM, "wintab,winink"));
 	}
 
 	if (tablet_driver == "") { // specified in project.godot
@@ -1645,7 +1662,13 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 			}
 		}
 
-		Color boot_bg_color = GLOBAL_DEF("application/boot_splash/bg_color", boot_splash_bg_color);
+#if defined(TOOLS_ENABLED) && !defined(NO_EDITOR_SPLASH)
+		const Color boot_bg_color =
+				GLOBAL_DEF("application/boot_splash/bg_color",
+						(editor || project_manager) ? boot_splash_editor_bg_color : boot_splash_bg_color);
+#else
+		const Color boot_bg_color = GLOBAL_DEF("application/boot_splash/bg_color", boot_splash_bg_color);
+#endif
 		if (boot_logo.is_valid()) {
 			RenderingServer::get_singleton()->set_boot_image(boot_logo, boot_bg_color, boot_logo_scale,
 					boot_logo_filter);
@@ -1727,6 +1750,19 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 
 	register_scene_types();
 
+#ifdef TOOLS_ENABLED
+	ClassDB::set_current_api(ClassDB::API_EDITOR);
+	EditorNode::register_editor_types();
+
+	ClassDB::set_current_api(ClassDB::API_CORE);
+
+#endif
+
+	MAIN_PRINT("Main: Load Modules, Physics, Drivers, Scripts");
+
+	register_platform_apis();
+	register_module_types();
+
 	GLOBAL_DEF("display/mouse_cursor/custom_image", String());
 	GLOBAL_DEF("display/mouse_cursor/custom_image_hotspot", Vector2());
 	GLOBAL_DEF("display/mouse_cursor/tooltip_position_offset", Point2(10, 10));
@@ -1743,18 +1779,6 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 			Input::get_singleton()->set_custom_mouse_cursor(cursor, Input::CURSOR_ARROW, hotspot);
 		}
 	}
-#ifdef TOOLS_ENABLED
-	ClassDB::set_current_api(ClassDB::API_EDITOR);
-	EditorNode::register_editor_types();
-
-	ClassDB::set_current_api(ClassDB::API_CORE);
-
-#endif
-
-	MAIN_PRINT("Main: Load Modules, Physics, Drivers, Scripts");
-
-	register_platform_apis();
-	register_module_types();
 
 	camera_server = CameraServer::create();
 
@@ -1778,7 +1802,7 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 	if (!project_manager) {
 		// If not running the project manager, and now that the engine is
 		// able to load resources, load the global shader variables.
-		// If running on editor, dont load the textures because the editor
+		// If running on editor, don't load the textures because the editor
 		// may want to import them first. Editor will reload those later.
 		rendering_server->global_variables_load_settings(!editor);
 	}
@@ -1786,7 +1810,7 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 	_start_success = true;
 	locale = String();
 
-	ClassDB::set_current_api(ClassDB::API_NONE); //no more api is registered at this point
+	ClassDB::set_current_api(ClassDB::API_NONE); //no more APIs are registered at this point
 
 	print_verbose("CORE API HASH: " + uitos(ClassDB::get_api_hash(ClassDB::API_CORE)));
 	print_verbose("EDITOR API HASH: " + uitos(ClassDB::get_api_hash(ClassDB::API_EDITOR)));
@@ -1977,7 +2001,7 @@ bool Main::start() {
 
 		if (check_only) {
 			if (!script_res->is_valid()) {
-				OS::get_singleton()->set_exit_code(1);
+				OS::get_singleton()->set_exit_code(EXIT_FAILURE);
 			}
 			return false;
 		}
@@ -2561,8 +2585,10 @@ void Main::force_redraw() {
  * so that the engine closes cleanly without leaking memory or crashing.
  * The order matters as some of those steps are linked with each other.
  */
-void Main::cleanup() {
-	ERR_FAIL_COND(!_start_success);
+void Main::cleanup(bool p_force) {
+	if (!p_force) {
+		ERR_FAIL_COND(!_start_success);
+	}
 
 	EngineDebugger::deinitialize();
 
@@ -2586,7 +2612,7 @@ void Main::cleanup() {
 	// Sync pending commands that may have been queued from a different thread during ScriptServer finalization
 	RenderingServer::get_singleton()->sync();
 
-	//clear global shader variables before scene and other graphics stuff is deinitialized.
+	//clear global shader variables before scene and other graphics stuff are deinitialized.
 	rendering_server->global_variables_clear();
 
 #ifdef TOOLS_ENABLED

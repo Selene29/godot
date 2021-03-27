@@ -157,7 +157,7 @@ Transform2D Camera2D::get_camera_transform() {
 		}
 
 		if (smoothing_enabled && !Engine::get_singleton()->is_editor_hint()) {
-			float c = smoothing * (process_callback == CAMERA2D_PROCESS_PHYSICS ? get_physics_process_delta_time() : get_process_delta_time());
+			real_t c = smoothing * (process_callback == CAMERA2D_PROCESS_PHYSICS ? get_physics_process_delta_time() : get_process_delta_time());
 			smoothed_camera_pos = ((camera_pos - smoothed_camera_pos) * c) + smoothed_camera_pos;
 			ret_camera_pos = smoothed_camera_pos;
 			//camera_pos=camera_pos*(1.0-smoothing)+new_camera_pos*smoothing;
@@ -172,7 +172,7 @@ Transform2D Camera2D::get_camera_transform() {
 
 	Point2 screen_offset = (anchor_mode == ANCHOR_MODE_DRAG_CENTER ? (screen_size * 0.5 * zoom) : Point2());
 
-	float angle = get_global_transform().get_rotation();
+	real_t angle = get_global_transform().get_rotation();
 	if (rotating) {
 		screen_offset = screen_offset.rotated(angle);
 	}
@@ -263,6 +263,7 @@ void Camera2D::_notification(int p_what) {
 			viewport = nullptr;
 
 		} break;
+#ifdef TOOLS_ENABLED
 		case NOTIFICATION_DRAW: {
 			if (!is_inside_tree() || !Engine::get_singleton()->is_editor_hint()) {
 				break;
@@ -270,7 +271,7 @@ void Camera2D::_notification(int p_what) {
 
 			if (screen_drawing_enabled) {
 				Color area_axis_color(0.5, 0.42, 0.87, 0.63);
-				float area_axis_width = 1;
+				real_t area_axis_width = 1;
 				if (is_current()) {
 					area_axis_width = 3;
 					area_axis_color.a = 0.83;
@@ -295,7 +296,7 @@ void Camera2D::_notification(int p_what) {
 
 			if (limit_drawing_enabled) {
 				Color limit_drawing_color(1, 1, 0, 0.63);
-				float limit_drawing_width = 1;
+				real_t limit_drawing_width = 1;
 				if (is_current()) {
 					limit_drawing_color.a = 0.83;
 					limit_drawing_width = 3;
@@ -317,7 +318,7 @@ void Camera2D::_notification(int p_what) {
 
 			if (margin_drawing_enabled) {
 				Color margin_drawing_color(0, 1, 1, 0.63);
-				float margin_drawing_width = 1;
+				real_t margin_drawing_width = 1;
 				if (is_current()) {
 					margin_drawing_width = 3;
 					margin_drawing_color.a = 0.83;
@@ -339,8 +340,8 @@ void Camera2D::_notification(int p_what) {
 					draw_line(inv_transform.xform(margin_endpoints[i]), inv_transform.xform(margin_endpoints[(i + 1) % 4]), margin_drawing_color, margin_drawing_width);
 				}
 			}
-
 		} break;
+#endif
 	}
 }
 
@@ -445,13 +446,13 @@ bool Camera2D::is_limit_smoothing_enabled() const {
 	return limit_smoothing_enabled;
 }
 
-void Camera2D::set_drag_margin(Side p_side, float p_drag_margin) {
+void Camera2D::set_drag_margin(Side p_side, real_t p_drag_margin) {
 	ERR_FAIL_INDEX((int)p_side, 4);
 	drag_margin[p_side] = p_drag_margin;
 	update();
 }
 
-float Camera2D::get_drag_margin(Side p_side) const {
+real_t Camera2D::get_drag_margin(Side p_side) const {
 	ERR_FAIL_INDEX_V((int)p_side, 4, 0);
 	return drag_margin[p_side];
 }
@@ -493,7 +494,7 @@ void Camera2D::align() {
 	_update_scroll();
 }
 
-void Camera2D::set_follow_smoothing(float p_speed) {
+void Camera2D::set_follow_smoothing(real_t p_speed) {
 	smoothing = p_speed;
 	if (smoothing > 0 && !(is_inside_tree() && Engine::get_singleton()->is_editor_hint())) {
 		set_process_internal(true);
@@ -502,7 +503,7 @@ void Camera2D::set_follow_smoothing(float p_speed) {
 	}
 }
 
-float Camera2D::get_follow_smoothing() const {
+real_t Camera2D::get_follow_smoothing() const {
 	return smoothing;
 }
 
@@ -534,7 +535,7 @@ bool Camera2D::is_drag_vertical_enabled() const {
 	return drag_vertical_enabled;
 }
 
-void Camera2D::set_drag_vertical_offset(float p_offset) {
+void Camera2D::set_drag_vertical_offset(real_t p_offset) {
 	drag_vertical_offset = p_offset;
 	drag_vertical_offset_changed = true;
 	Point2 old_smoothed_camera_pos = smoothed_camera_pos;
@@ -542,11 +543,11 @@ void Camera2D::set_drag_vertical_offset(float p_offset) {
 	smoothed_camera_pos = old_smoothed_camera_pos;
 }
 
-float Camera2D::get_drag_vertical_offset() const {
+real_t Camera2D::get_drag_vertical_offset() const {
 	return drag_vertical_offset;
 }
 
-void Camera2D::set_drag_horizontal_offset(float p_offset) {
+void Camera2D::set_drag_horizontal_offset(real_t p_offset) {
 	drag_horizontal_offset = p_offset;
 	drag_horizontal_offset_changed = true;
 	Point2 old_smoothed_camera_pos = smoothed_camera_pos;
@@ -554,11 +555,11 @@ void Camera2D::set_drag_horizontal_offset(float p_offset) {
 	smoothed_camera_pos = old_smoothed_camera_pos;
 }
 
-float Camera2D::get_drag_horizontal_offset() const {
+real_t Camera2D::get_drag_horizontal_offset() const {
 	return drag_horizontal_offset;
 }
 
-void Camera2D::_set_old_smoothing(float p_enable) {
+void Camera2D::_set_old_smoothing(real_t p_enable) {
 	//compatibility
 	if (p_enable > 0) {
 		smoothing_enabled = true;
@@ -568,6 +569,7 @@ void Camera2D::_set_old_smoothing(float p_enable) {
 
 void Camera2D::set_enable_follow_smoothing(bool p_enabled) {
 	smoothing_enabled = p_enabled;
+	notify_property_list_changed();
 }
 
 bool Camera2D::is_follow_smoothing_enabled() const {
@@ -610,7 +612,9 @@ Node *Camera2D::get_custom_viewport() const {
 
 void Camera2D::set_screen_drawing_enabled(bool enable) {
 	screen_drawing_enabled = enable;
+#ifdef TOOLS_ENABLED
 	update();
+#endif
 }
 
 bool Camera2D::is_screen_drawing_enabled() const {
@@ -619,7 +623,9 @@ bool Camera2D::is_screen_drawing_enabled() const {
 
 void Camera2D::set_limit_drawing_enabled(bool enable) {
 	limit_drawing_enabled = enable;
+#ifdef TOOLS_ENABLED
 	update();
+#endif
 }
 
 bool Camera2D::is_limit_drawing_enabled() const {
@@ -628,11 +634,19 @@ bool Camera2D::is_limit_drawing_enabled() const {
 
 void Camera2D::set_margin_drawing_enabled(bool enable) {
 	margin_drawing_enabled = enable;
+#ifdef TOOLS_ENABLED
 	update();
+#endif
 }
 
 bool Camera2D::is_margin_drawing_enabled() const {
 	return margin_drawing_enabled;
+}
+
+void Camera2D::_validate_property(PropertyInfo &property) const {
+	if (!smoothing_enabled && property.name == "smoothing_speed") {
+		property.usage = PROPERTY_USAGE_NOEDITOR;
+	}
 }
 
 void Camera2D::_bind_methods() {

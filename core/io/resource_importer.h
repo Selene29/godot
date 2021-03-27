@@ -82,6 +82,7 @@ public:
 	Ref<ResourceImporter> get_importer_by_name(const String &p_name) const;
 	Ref<ResourceImporter> get_importer_by_extension(const String &p_extension) const;
 	void get_importers_for_extension(const String &p_extension, List<Ref<ResourceImporter>> *r_importers);
+	void get_importers(List<Ref<ResourceImporter>> *r_importers);
 
 	bool are_import_settings_valid(const String &p_path) const;
 	String get_import_settings_hash() const;
@@ -113,6 +114,9 @@ public:
 		}
 		ImportOption() {}
 	};
+
+	virtual bool has_advanced_options() const { return false; }
+	virtual void show_advanced_options(const String &p_path) {}
 
 	virtual int get_preset_count() const { return 0; }
 	virtual String get_preset_name(int p_idx) const { return String(); }

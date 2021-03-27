@@ -92,7 +92,6 @@
 #include "editor/filesystem_dock.h"
 #include "editor/import/editor_import_collada.h"
 #include "editor/import/resource_importer_bitmask.h"
-#include "editor/import/resource_importer_csv.h"
 #include "editor/import/resource_importer_csv_translation.h"
 #include "editor/import/resource_importer_image.h"
 #include "editor/import/resource_importer_layered_texture.h"
@@ -102,6 +101,7 @@
 #include "editor/import/resource_importer_texture.h"
 #include "editor/import/resource_importer_texture_atlas.h"
 #include "editor/import/resource_importer_wav.h"
+#include "editor/import/scene_import_settings.h"
 #include "editor/import/scene_importer_mesh_node_3d.h"
 #include "editor/import_dock.h"
 #include "editor/multi_node_edit.h"
@@ -592,6 +592,9 @@ void EditorNode::_notification(int p_what) {
 				_editor_select(EDITOR_3D);
 			}
 
+			// Save the project after opening to mark it as last modified.
+			ProjectSettings::get_singleton()->save();
+
 			/* DO NOT LOAD SCENES HERE, WAIT FOR FILE SCANNING AND REIMPORT TO COMPLETE */
 		} break;
 
@@ -902,7 +905,8 @@ void EditorNode::_scan_external_changes() {
 	// Check if any edited scene has changed.
 
 	for (int i = 0; i < editor_data.get_edited_scene_count(); i++) {
-		if (editor_data.get_scene_path(i) == "") {
+		DirAccessRef da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
+		if (editor_data.get_scene_path(i) == "" || !da->file_exists(editor_data.get_scene_path(i))) {
 			continue;
 		}
 
@@ -1088,13 +1092,23 @@ void EditorNode::save_resource_as(const Ref<Resource> &p_resource, const String 
 	file->clear_filters();
 
 	List<String> preferred;
-	for (int i = 0; i < extensions.size(); i++) {
-		if (p_resource->is_class("Script") && (extensions[i] == "tres" || extensions[i] == "res" || extensions[i] == "xml")) {
+	for (List<String>::Element *E = extensions.front(); E; E = E->next()) {
+		if (p_resource->is_class("Script") && (E->get() == "tres" || E->get() == "res")) {
 			//this serves no purpose and confused people
 			continue;
 		}
-		file->add_filter("*." + extensions[i] + " ; " + extensions[i].to_upper());
-		preferred.push_back(extensions[i]);
+		file->add_filter("*." + E->get() + " ; " + E->get().to_upper());
+		preferred.push_back(E->get());
+	}
+	// Lowest priority extension
+	List<String>::Element *res_element = preferred.find("res");
+	if (res_element) {
+		preferred.move_to_back(res_element);
+	}
+	// Highest priority extension
+	List<String>::Element *tres_element = preferred.find("tres");
+	if (tres_element) {
+		preferred.move_to_front(tres_element);
 	}
 
 	if (p_at_path != String()) {
@@ -2386,11 +2400,14 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 				_scene_tab_changed(tab_closing);
 
 				if (unsaved_cache || p_option == FILE_CLOSE_ALL_AND_QUIT || p_option == FILE_CLOSE_ALL_AND_RUN_PROJECT_MANAGER) {
-					String scene_filename = editor_data.get_edited_scene_root(tab_closing)->get_filename();
-					save_confirmation->get_ok_button()->set_text(TTR("Save & Close"));
-					save_confirmation->set_text(vformat(TTR("Save changes to '%s' before closing?"), scene_filename != "" ? scene_filename : "unsaved scene"));
-					save_confirmation->popup_centered();
-					break;
+					Node *scene_root = editor_data.get_edited_scene_root(tab_closing);
+					if (scene_root) {
+						String scene_filename = scene_root->get_filename();
+						save_confirmation->get_ok_button()->set_text(TTR("Save & Close"));
+						save_confirmation->set_text(vformat(TTR("Save changes to '%s' before closing?"), scene_filename != "" ? scene_filename : "unsaved scene"));
+						save_confirmation->popup_centered();
+						break;
+					}
 				}
 			} else if (p_option == FILE_CLOSE) {
 				tab_closing = editor_data.get_edited_scene();
@@ -4821,15 +4838,15 @@ void EditorNode::_scene_tab_input(const Ref<InputEvent> &p_input) {
 
 	if (mb.is_valid()) {
 		if (scene_tabs->get_hovered_tab() >= 0) {
-			if (mb->get_button_index() == BUTTON_MIDDLE && mb->is_pressed()) {
+			if (mb->get_button_index() == MOUSE_BUTTON_MIDDLE && mb->is_pressed()) {
 				_scene_tab_closed(scene_tabs->get_hovered_tab());
 			}
 		} else {
-			if ((mb->get_button_index() == BUTTON_LEFT && mb->is_doubleclick()) || (mb->get_button_index() == BUTTON_MIDDLE && mb->is_pressed())) {
+			if ((mb->get_button_index() == MOUSE_BUTTON_LEFT && mb->is_doubleclick()) || (mb->get_button_index() == MOUSE_BUTTON_MIDDLE && mb->is_pressed())) {
 				_menu_option_confirm(FILE_NEW_SCENE, true);
 			}
 		}
-		if (mb->get_button_index() == BUTTON_RIGHT && mb->is_pressed()) {
+		if (mb->get_button_index() == MOUSE_BUTTON_RIGHT && mb->is_pressed()) {
 			// context menu
 			scene_tabs_context_menu->clear();
 			scene_tabs_context_menu->set_size(Size2(1, 1));
@@ -5764,10 +5781,6 @@ EditorNode::EditorNode() {
 		import_csv_translation.instance();
 		ResourceFormatImporter::get_singleton()->add_importer(import_csv_translation);
 
-		Ref<ResourceImporterCSV> import_csv;
-		import_csv.instance();
-		ResourceFormatImporter::get_singleton()->add_importer(import_csv);
-
 		Ref<ResourceImporterWAV> import_wav;
 		import_wav.instance();
 		ResourceFormatImporter::get_singleton()->add_importer(import_wav);
@@ -6165,6 +6178,9 @@ EditorNode::EditorNode() {
 	project_settings = memnew(ProjectSettingsEditor(&editor_data));
 	gui_base->add_child(project_settings);
 
+	scene_import_settings = memnew(SceneImportSettings);
+	gui_base->add_child(scene_import_settings);
+
 	export_template_manager = memnew(ExportTemplateManager);
 	gui_base->add_child(export_template_manager);
 
@@ -6352,7 +6368,11 @@ EditorNode::EditorNode() {
 
 	p = help_menu->get_popup();
 	p->connect("id_pressed", callable_mp(this, &EditorNode::_menu_option));
-	p->add_icon_shortcut(gui_base->get_theme_icon("HelpSearch", "EditorIcons"), ED_SHORTCUT("editor/editor_help", TTR("Search")), HELP_SEARCH);
+#ifdef OSX_ENABLED
+	p->add_icon_shortcut(gui_base->get_theme_icon("HelpSearch", "EditorIcons"), ED_SHORTCUT("editor/editor_help", TTR("Search Help"), KEY_MASK_ALT | KEY_SPACE), HELP_SEARCH);
+#else
+	p->add_icon_shortcut(gui_base->get_theme_icon("HelpSearch", "EditorIcons"), ED_SHORTCUT("editor/editor_help", TTR("Search Help"), KEY_F1), HELP_SEARCH);
+#endif
 	p->add_separator();
 	p->add_icon_shortcut(gui_base->get_theme_icon("Instance", "EditorIcons"), ED_SHORTCUT("editor/online_docs", TTR("Online Docs")), HELP_DOCS);
 	p->add_icon_shortcut(gui_base->get_theme_icon("Instance", "EditorIcons"), ED_SHORTCUT("editor/q&a", TTR("Q&A")), HELP_QA);
@@ -6449,8 +6469,8 @@ EditorNode::EditorNode() {
 	video_driver->connect("item_selected", callable_mp(this, &EditorNode::_video_driver_selected));
 	video_driver->add_theme_font_override("font", gui_base->get_theme_font("bold", "EditorFonts"));
 	video_driver->add_theme_font_size_override("font_size", gui_base->get_theme_font_size("bold_size", "EditorFonts"));
-	// TODO re-enable when GLES2 is ported
-	video_driver->set_disabled(true);
+	// TODO: Show again when OpenGL is ported.
+	video_driver->set_visible(false);
 	right_menu_hb->add_child(video_driver);
 
 #ifndef _MSC_VER
@@ -6943,14 +6963,12 @@ EditorNode::EditorNode() {
 	ED_SHORTCUT("editor/editor_3d", TTR("Open 3D Editor"), KEY_MASK_ALT | KEY_2);
 	ED_SHORTCUT("editor/editor_script", TTR("Open Script Editor"), KEY_MASK_ALT | KEY_3);
 	ED_SHORTCUT("editor/editor_assetlib", TTR("Open Asset Library"), KEY_MASK_ALT | KEY_4);
-	ED_SHORTCUT("editor/editor_help", TTR("Search Help"), KEY_MASK_ALT | KEY_SPACE);
 #else
 	// Use the Ctrl modifier so F2 can be used to rename nodes in the scene tree dock.
 	ED_SHORTCUT("editor/editor_2d", TTR("Open 2D Editor"), KEY_MASK_CTRL | KEY_F1);
 	ED_SHORTCUT("editor/editor_3d", TTR("Open 3D Editor"), KEY_MASK_CTRL | KEY_F2);
 	ED_SHORTCUT("editor/editor_script", TTR("Open Script Editor"), KEY_MASK_CTRL | KEY_F3);
 	ED_SHORTCUT("editor/editor_assetlib", TTR("Open Asset Library"), KEY_MASK_CTRL | KEY_F4);
-	ED_SHORTCUT("editor/editor_help", TTR("Search Help"), KEY_F1);
 #endif
 	ED_SHORTCUT("editor/editor_next", TTR("Open the next Editor"));
 	ED_SHORTCUT("editor/editor_prev", TTR("Open the previous Editor"));

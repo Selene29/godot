@@ -113,6 +113,24 @@ void ColorPicker::_update_controls() {
 		btn_hsv->set_disabled(false);
 	}
 
+	if (raw_mode_enabled) {
+		for (int i = 0; i < 3; i++) {
+			scroll[i]->add_theme_icon_override("grabber", Ref<Texture2D>());
+			scroll[i]->add_theme_icon_override("grabber_highlight", Ref<Texture2D>());
+			scroll[i]->add_theme_style_override("slider", Ref<StyleBox>());
+			scroll[i]->add_theme_style_override("grabber_area", Ref<StyleBox>());
+			scroll[i]->add_theme_style_override("grabber_area_highlight", Ref<StyleBox>());
+		}
+	} else {
+		for (int i = 0; i < 3; i++) {
+			scroll[i]->add_theme_icon_override("grabber", get_theme_icon("bar_arrow"));
+			scroll[i]->add_theme_icon_override("grabber_highlight", get_theme_icon("bar_arrow"));
+			scroll[i]->add_theme_style_override("slider", Ref<StyleBoxEmpty>(memnew(StyleBoxEmpty)));
+			scroll[i]->add_theme_style_override("grabber_area", Ref<StyleBoxEmpty>(memnew(StyleBoxEmpty)));
+			scroll[i]->add_theme_style_override("grabber_area_highlight", Ref<StyleBoxEmpty>(memnew(StyleBoxEmpty)));
+		}
+	}
+
 	if (edit_alpha) {
 		values[3]->show();
 		scroll[3]->show();
@@ -166,10 +184,13 @@ void ColorPicker::_value_changed(double) {
 	}
 
 	if (hsv_mode_enabled) {
-		color.set_hsv(scroll[0]->get_value() / 360.0,
-				scroll[1]->get_value() / 100.0,
-				scroll[2]->get_value() / 100.0,
-				scroll[3]->get_value() / 255.0);
+		h = scroll[0]->get_value() / 360.0;
+		s = scroll[1]->get_value() / 100.0;
+		v = scroll[2]->get_value() / 100.0;
+		color.set_hsv(h, s, v, scroll[3]->get_value() / 255.0);
+
+		last_hsv = color;
+
 	} else {
 		for (int i = 0; i < 4; i++) {
 			color.components[i] = scroll[i]->get_value() / (raw_mode_enabled ? 1.0 : 255.0);
@@ -240,6 +261,9 @@ void ColorPicker::_update_color(bool p_update_sliders) {
 	sample->update();
 	uv_edit->update();
 	w_edit->update();
+	for (int i = 0; i < 4; i++) {
+		scroll[i]->update();
+	}
 	updating = false;
 }
 
@@ -453,11 +477,74 @@ void ColorPicker::_hsv_draw(int p_which, Control *c) {
 	}
 }
 
+void ColorPicker::_slider_draw(int p_which) {
+	Vector<Vector2> pos;
+	pos.resize(4);
+	Vector<Color> col;
+	col.resize(4);
+	Size2 size = scroll[p_which]->get_size();
+	Color left_color;
+	Color right_color;
+#ifdef TOOLS_ENABLED
+	const real_t margin = 4 * EDSCALE;
+#else
+	const real_t margin = 4;
+#endif
+
+	if (p_which == 3) {
+		scroll[p_which]->draw_texture_rect(get_theme_icon("preset_bg", "ColorPicker"), Rect2(Point2(0, margin), Size2(size.x, margin)), true);
+
+		left_color = color;
+		left_color.a = 0;
+		right_color = color;
+		right_color.a = 1;
+	} else {
+		if (raw_mode_enabled) {
+			return;
+		}
+		if (hsv_mode_enabled) {
+			if (p_which == 0) {
+				Ref<Texture2D> hue = get_theme_icon("color_hue", "ColorPicker");
+				scroll[p_which]->draw_set_transform(Point2(), -Math_PI / 2, Size2(1.0, 1.0));
+				scroll[p_which]->draw_texture_rect(hue, Rect2(Vector2(margin * -2, 0), Vector2(scroll[p_which]->get_size().x, margin)), false, Color(1, 1, 1), true);
+				return;
+			}
+			Color s_col;
+			Color v_col;
+			s_col.set_hsv(h, 0, v);
+			left_color = (p_which == 1) ? s_col : Color(0, 0, 0);
+			s_col.set_hsv(h, 1, v);
+			v_col.set_hsv(h, s, 1);
+			right_color = (p_which == 1) ? s_col : v_col;
+		} else {
+			left_color = Color(
+					p_which == 0 ? 0 : color.r,
+					p_which == 1 ? 0 : color.g,
+					p_which == 2 ? 0 : color.b);
+			right_color = Color(
+					p_which == 0 ? 1 : color.r,
+					p_which == 1 ? 1 : color.g,
+					p_which == 2 ? 1 : color.b);
+		}
+	}
+
+	col.set(0, left_color);
+	col.set(1, right_color);
+	col.set(2, right_color);
+	col.set(3, left_color);
+	pos.set(0, Vector2(0, margin));
+	pos.set(1, Vector2(size.x, margin));
+	pos.set(2, Vector2(size.x, margin * 2));
+	pos.set(3, Vector2(0, margin * 2));
+
+	scroll[p_which]->draw_polygon(pos, col);
+}
+
 void ColorPicker::_uv_input(const Ref<InputEvent> &p_event) {
 	Ref<InputEventMouseButton> bev = p_event;
 
 	if (bev.is_valid()) {
-		if (bev->is_pressed() && bev->get_button_index() == BUTTON_LEFT) {
+		if (bev->is_pressed() && bev->get_button_index() == MOUSE_BUTTON_LEFT) {
 			changing_color = true;
 			float x = CLAMP((float)bev->get_position().x, 0, uv_edit->get_size().width);
 			float y = CLAMP((float)bev->get_position().y, 0, uv_edit->get_size().height);
@@ -470,7 +557,7 @@ void ColorPicker::_uv_input(const Ref<InputEvent> &p_event) {
 			if (!deferred_mode_enabled) {
 				emit_signal("color_changed", color);
 			}
-		} else if (deferred_mode_enabled && !bev->is_pressed() && bev->get_button_index() == BUTTON_LEFT) {
+		} else if (deferred_mode_enabled && !bev->is_pressed() && bev->get_button_index() == MOUSE_BUTTON_LEFT) {
 			emit_signal("color_changed", color);
 			changing_color = false;
 		} else {
@@ -502,7 +589,7 @@ void ColorPicker::_w_input(const Ref<InputEvent> &p_event) {
 	Ref<InputEventMouseButton> bev = p_event;
 
 	if (bev.is_valid()) {
-		if (bev->is_pressed() && bev->get_button_index() == BUTTON_LEFT) {
+		if (bev->is_pressed() && bev->get_button_index() == MOUSE_BUTTON_LEFT) {
 			changing_color = true;
 			float y = CLAMP((float)bev->get_position().y, 0, w_edit->get_size().height);
 			h = y / w_edit->get_size().height;
@@ -515,7 +602,7 @@ void ColorPicker::_w_input(const Ref<InputEvent> &p_event) {
 		_update_color();
 		if (!deferred_mode_enabled) {
 			emit_signal("color_changed", color);
-		} else if (!bev->is_pressed() && bev->get_button_index() == BUTTON_LEFT) {
+		} else if (!bev->is_pressed() && bev->get_button_index() == MOUSE_BUTTON_LEFT) {
 			emit_signal("color_changed", color);
 		}
 	}
@@ -543,7 +630,7 @@ void ColorPicker::_preset_input(const Ref<InputEvent> &p_event) {
 
 	if (bev.is_valid()) {
 		int index = 0;
-		if (bev->is_pressed() && bev->get_button_index() == BUTTON_LEFT) {
+		if (bev->is_pressed() && bev->get_button_index() == MOUSE_BUTTON_LEFT) {
 			for (int i = 0; i < presets.size(); i++) {
 				int x = (i % presets_per_row) * bt_add_preset->get_size().x;
 				int y = (Math::floor((float)i / presets_per_row)) * bt_add_preset->get_size().y;
@@ -554,7 +641,7 @@ void ColorPicker::_preset_input(const Ref<InputEvent> &p_event) {
 			set_pick_color(presets[index]);
 			_update_color();
 			emit_signal("color_changed", color);
-		} else if (bev->is_pressed() && bev->get_button_index() == BUTTON_RIGHT && presets_enabled) {
+		} else if (bev->is_pressed() && bev->get_button_index() == MOUSE_BUTTON_RIGHT && presets_enabled) {
 			index = bev->get_position().x / (preset->get_size().x / presets.size());
 			Color clicked_preset = presets[index];
 			erase_preset(clicked_preset);
@@ -583,7 +670,7 @@ void ColorPicker::_screen_input(const Ref<InputEvent> &p_event) {
 	}
 
 	Ref<InputEventMouseButton> bev = p_event;
-	if (bev.is_valid() && bev->get_button_index() == BUTTON_LEFT && !bev->is_pressed()) {
+	if (bev.is_valid() && bev->get_button_index() == MOUSE_BUTTON_LEFT && !bev->is_pressed()) {
 		emit_signal("color_changed", color);
 		screen->hide();
 	}
@@ -796,10 +883,16 @@ ColorPicker::ColorPicker() :
 		scroll[i]->set_h_size_flags(SIZE_EXPAND_FILL);
 
 		scroll[i]->connect("value_changed", callable_mp(this, &ColorPicker::_value_changed));
+		scroll[i]->connect("draw", callable_mp(this, &ColorPicker::_slider_draw), make_binds(i));
 
 		vbr->add_child(hbc);
 	}
 	labels[3]->set_text("A");
+	scroll[3]->add_theme_icon_override("grabber", get_theme_icon("bar_arrow"));
+	scroll[3]->add_theme_icon_override("grabber_highlight", get_theme_icon("bar_arrow"));
+	scroll[3]->add_theme_style_override("slider", Ref<StyleBoxEmpty>(memnew(StyleBoxEmpty)));
+	scroll[3]->add_theme_style_override("grabber_area", Ref<StyleBoxEmpty>(memnew(StyleBoxEmpty)));
+	scroll[3]->add_theme_style_override("grabber_area_highlight", Ref<StyleBoxEmpty>(memnew(StyleBoxEmpty)));
 
 	HBoxContainer *hhb = memnew(HBoxContainer);
 	vbr->add_child(hhb);
