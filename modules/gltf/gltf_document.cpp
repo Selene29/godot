@@ -3293,6 +3293,7 @@ Error GLTFDocument::_serialize_materials(Ref<GLTFState> state) {
 				}
 				img->decompress();
 				img->convert(Image::FORMAT_RGBA8);
+				img->convert_ra_rgba8_to_rg();
 				for (int32_t y = 0; y < img->get_height(); y++) {
 					for (int32_t x = 0; x < img->get_width(); x++) {
 						Color c = img->get_pixel(x, y);
@@ -4958,8 +4959,8 @@ GLTFMeshIndex GLTFDocument::_convert_mesh_instance(Ref<GLTFState> state, MeshIns
 		if (godot_array_mesh.is_valid()) {
 			surface_name = godot_array_mesh->surface_get_name(surface_i);
 		}
-		if (p_mesh_instance->get_surface_material(surface_i).is_valid()) {
-			mat = p_mesh_instance->get_surface_material(surface_i);
+		if (p_mesh_instance->get_surface_override_material(surface_i).is_valid()) {
+			mat = p_mesh_instance->get_surface_override_material(surface_i);
 		}
 		if (p_mesh_instance->get_material_override().is_valid()) {
 			mat = p_mesh_instance->get_material_override();

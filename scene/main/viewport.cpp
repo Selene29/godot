@@ -2399,29 +2399,27 @@ void Viewport::_gui_input_event(Ref<InputEvent> p_event) {
 		if (from && p_event->is_pressed()) {
 			Control *next = nullptr;
 
-			Input *input = Input::get_singleton();
-
-			if (p_event->is_action_pressed("ui_focus_next") && input->is_action_just_pressed("ui_focus_next")) {
+			if (p_event->is_action_pressed("ui_focus_next", true)) {
 				next = from->find_next_valid_focus();
 			}
 
-			if (p_event->is_action_pressed("ui_focus_prev") && input->is_action_just_pressed("ui_focus_prev")) {
+			if (p_event->is_action_pressed("ui_focus_prev", true)) {
 				next = from->find_prev_valid_focus();
 			}
 
-			if (!mods && p_event->is_action_pressed("ui_up") && input->is_action_just_pressed("ui_up")) {
+			if (!mods && p_event->is_action_pressed("ui_up", true)) {
 				next = from->_get_focus_neighbor(SIDE_TOP);
 			}
 
-			if (!mods && p_event->is_action_pressed("ui_left") && input->is_action_just_pressed("ui_left")) {
+			if (!mods && p_event->is_action_pressed("ui_left", true)) {
 				next = from->_get_focus_neighbor(SIDE_LEFT);
 			}
 
-			if (!mods && p_event->is_action_pressed("ui_right") && input->is_action_just_pressed("ui_right")) {
+			if (!mods && p_event->is_action_pressed("ui_right", true)) {
 				next = from->_get_focus_neighbor(SIDE_RIGHT);
 			}
 
-			if (!mods && p_event->is_action_pressed("ui_down") && input->is_action_just_pressed("ui_down")) {
+			if (!mods && p_event->is_action_pressed("ui_down", true)) {
 				next = from->_get_focus_neighbor(SIDE_BOTTOM);
 			}
 
@@ -3177,20 +3175,17 @@ Variant Viewport::gui_get_drag_data() const {
 	return gui.drag_data;
 }
 
-String Viewport::get_configuration_warning() const {
+TypedArray<String> Viewport::get_configuration_warnings() const {
 	/*if (get_parent() && !Object::cast_to<Control>(get_parent()) && !render_target) {
 		return TTR("This viewport is not set as render target. If you intend for it to display its contents directly to the screen, make it a child of a Control so it can obtain a size. Otherwise, make it a RenderTarget and assign its internal texture to some node for display.");
 	}*/
 
-	String warning = Node::get_configuration_warning();
+	TypedArray<String> warnings = Node::get_configuration_warnings();
 
 	if (size.x == 0 || size.y == 0) {
-		if (!warning.is_empty()) {
-			warning += "\n\n";
-		}
-		warning += TTR("Viewport size must be greater than 0 to render anything.");
+		warnings.push_back(TTR("Viewport size must be greater than 0 to render anything."));
 	}
-	return warning;
+	return warnings;
 }
 
 void Viewport::gui_reset_canvas_sort_index() {

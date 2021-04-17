@@ -296,7 +296,7 @@ private:
 		String sp = _test_path();
 		if (sp != "") {
 			// If the project name is empty or default, infer the project name from the selected folder name
-			if (project_name->get_text() == "" || project_name->get_text() == TTR("New Game Project")) {
+			if (project_name->get_text().strip_edges() == "" || project_name->get_text().strip_edges() == TTR("New Game Project")) {
 				sp = sp.replace("\\", "/");
 				int lidx = sp.rfind("/");
 
@@ -380,16 +380,17 @@ private:
 	}
 
 	void _create_folder() {
-		if (project_name->get_text() == "" || created_folder_path != "" || project_name->get_text().ends_with(".") || project_name->get_text().ends_with(" ")) {
-			set_message(TTR("Invalid Project Name."), MESSAGE_WARNING);
+		const String project_name_no_edges = project_name->get_text().strip_edges();
+		if (project_name_no_edges == "" || created_folder_path != "" || project_name_no_edges.ends_with(".")) {
+			set_message(TTR("Invalid project name."), MESSAGE_WARNING);
 			return;
 		}
 
 		DirAccess *d = DirAccess::create(DirAccess::ACCESS_FILESYSTEM);
 		if (d->change_dir(project_path->get_text()) == OK) {
-			if (!d->dir_exists(project_name->get_text())) {
-				if (d->make_dir(project_name->get_text()) == OK) {
-					d->change_dir(project_name->get_text());
+			if (!d->dir_exists(project_name_no_edges)) {
+				if (d->make_dir(project_name_no_edges) == OK) {
+					d->change_dir(project_name_no_edges);
 					String dir_str = d->get_current_dir();
 					project_path->set_text(dir_str);
 					_path_text_changed(dir_str);
@@ -415,7 +416,7 @@ private:
 
 		_test_path();
 
-		if (p_text == "") {
+		if (p_text.strip_edges() == "") {
 			set_message(TTR("It would be a good idea to name your project."), MESSAGE_ERROR);
 		}
 	}
@@ -442,7 +443,7 @@ private:
 				set_message(vformat(TTR("Couldn't load project.godot in project path (error %d). It may be missing or corrupted."), err), MESSAGE_ERROR);
 			} else {
 				ProjectSettings::CustomMap edited_settings;
-				edited_settings["application/config/name"] = project_name->get_text();
+				edited_settings["application/config/name"] = project_name->get_text().strip_edges();
 
 				if (current->save_custom(dir2.plus_file("project.godot"), edited_settings, Vector<String>(), true) != OK) {
 					set_message(TTR("Couldn't edit project.godot in project path."), MESSAGE_ERROR);
@@ -483,7 +484,7 @@ private:
 						initial_settings["rendering/textures/vram_compression/import_etc2"] = false;
 						initial_settings["rendering/textures/vram_compression/import_etc"] = true;
 					}
-					initial_settings["application/config/name"] = project_name->get_text();
+					initial_settings["application/config/name"] = project_name->get_text().strip_edges();
 					initial_settings["application/config/icon"] = "res://icon.png";
 					initial_settings["rendering/environment/defaults/default_environment"] = "res://default_env.tres";
 
@@ -1851,6 +1852,9 @@ void ProjectManager::_notification(int p_what) {
 		case NOTIFICATION_WM_CLOSE_REQUEST: {
 			_dim_window();
 		} break;
+		case NOTIFICATION_WM_ABOUT: {
+			_show_about();
+		} break;
 	}
 }
 
@@ -2254,6 +2258,10 @@ void ProjectManager::_erase_missing_projects() {
 	erase_missing_ask->popup_centered();
 }
 
+void ProjectManager::_show_about() {
+	about->popup_centered(Size2(780, 500) * EDSCALE);
+}
+
 void ProjectManager::_language_selected(int p_id) {
 	String lang = language_btn->get_item_metadata(p_id);
 	EditorSettings::get_singleton()->set("interface/editor/editor_language", lang);
@@ -2443,12 +2451,7 @@ ProjectManager::ProjectManager() {
 	}
 
 	// TRANSLATORS: This refers to the application where users manage their Godot projects.
-	if (TS->is_locale_right_to_left(TranslationServer::get_singleton()->get_tool_locale())) {
-		// For RTL languages, embed translated part of the title (using control characters) to ensure correct order.
-		DisplayServer::get_singleton()->window_set_title(VERSION_NAME + String(" - ") + String::chr(0x202B) + TTR("Project Manager") + String::chr(0x202C) + String::chr(0x200E) + " - " + String::chr(0xA9) + " 2007-2021 Juan Linietsky, Ariel Manzur & Godot Contributors");
-	} else {
-		DisplayServer::get_singleton()->window_set_title(VERSION_NAME + String(" - ") + TTR("Project Manager") + " - " + String::chr(0xA9) + " 2007-2021 Juan Linietsky, Ariel Manzur & Godot Contributors");
-	}
+	DisplayServer::get_singleton()->window_set_title(VERSION_NAME + String(" - ") + TTR("Project Manager"));
 
 	FileDialog::set_default_show_hidden_files(EditorSettings::get_singleton()->get("filesystem/file_dialog/show_hidden_files"));
 
@@ -2582,6 +2585,13 @@ ProjectManager::ProjectManager() {
 		erase_missing_btn->set_text(TTR("Remove Missing"));
 		erase_missing_btn->connect("pressed", callable_mp(this, &ProjectManager::_erase_missing_projects));
 		tree_vb->add_child(erase_missing_btn);
+
+		tree_vb->add_spacer();
+
+		about_btn = memnew(Button);
+		about_btn->set_text(TTR("About"));
+		about_btn->connect("pressed", callable_mp(this, &ProjectManager::_show_about));
+		tree_vb->add_child(about_btn);
 	}
 
 	{
@@ -2715,6 +2725,9 @@ ProjectManager::ProjectManager() {
 		open_templates->get_ok_button()->set_text(TTR("Open Asset Library"));
 		open_templates->connect("confirmed", callable_mp(this, &ProjectManager::_open_asset_library));
 		add_child(open_templates);
+
+		about = memnew(EditorAbout);
+		add_child(about);
 	}
 
 	_load_recent_projects();
