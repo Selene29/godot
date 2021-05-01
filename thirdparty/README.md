@@ -62,6 +62,26 @@ Files extracted from upstream source:
 Extracted from .zip provided. Extracted license and header only.
 
 
+## embree-aarch64
+
+- Upstream: https://github.com/lighttransport/embree-aarch64
+- Version: 3.12.1 (6ef362f99af80c9dfe8dd2bfc582d9067897edc6, 2020)
+- License: Apache 2.0
+
+Files extracted from upstream:
+
+- All cpp files listed in `modules/raycast/godot_update_embree.py`
+- All header files in the directories listed in `modules/raycast/godot_update_embree.py`
+
+The `modules/raycast/godot_update_embree.py`script can be used to pull the 
+relevant files from the latest Embree-aarch64 release and apply some automatic changes.
+
+Some changes have been made in order to remove exceptions and fix minor build errors.
+They are marked with `// -- GODOT start --` and `// -- GODOT end --`
+comments. Apply the patches in the `patches/` folder when syncing on newer upstream
+commits.
+
+
 ## enet
 
 - Upstream: http://enet.bespin.org
@@ -100,6 +120,7 @@ Files extracted from upstream source:
   ProcessDxtc.{cpp,hpp} Tables.{cpp,hpp} Vector.hpp
   ```
 - `AUTHORS.txt` and `LICENSE.txt`
+
 
 ## fonts
 
@@ -185,17 +206,17 @@ Files extracted from upstream source:
 ## icu4c
 
 - Upstream: https://github.com/unicode-org/icu
-- Version: 68.2 (84e1f26ea77152936e70d53178a816dbfbf69989, 2020)
+- Version: 69.1 (0e7b4428866f3133b4abba2d932ee3faa708db1d, 2021)
 - License: Unicode
 
 Files extracted from upstream source:
 
 - the `common` folder
-- `APIChangeReport.md`, `LICENSE`
+- `LICENSE`
 
 Files generated from upstream source:
 
-- the `icudt68l.dat` built with the provided `godot_data.json` config file (see
+- the `icudt69l.dat` built with the provided `godot_data.json` config file (see
   https://github.com/unicode-org/icu/blob/master/docs/userguide/icu_data/buildtool.md
   for instructions)
 
@@ -343,7 +364,7 @@ File extracted from upstream release tarball:
 ## meshoptimizer
 
 - Upstream: https://github.com/zeux/meshoptimizer
-- Version: git (e3f53f66e7a35b9b8764bee478589d79e34fa698, 2021)
+- Version: 0.16 (95893c0566646434dd675b708d293fcb2d526d08, 2021)
 - License: MIT
 
 Files extracted from upstream repository:

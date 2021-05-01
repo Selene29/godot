@@ -143,36 +143,6 @@ static _FORCE_INLINE_ void vc_ptrcall(void (T::*method)(P...) const, void *p_bas
 }
 
 template <class R, class T, class... P>
-static _FORCE_INLINE_ void vc_change_return_type(R (T::*method)(P...), Variant *v) {
-	VariantTypeAdjust<R>::adjust(v);
-}
-
-template <class R, class T, class... P>
-static _FORCE_INLINE_ void vc_change_return_type(R (T::*method)(P...) const, Variant *v) {
-	VariantTypeAdjust<R>::adjust(v);
-}
-
-template <class T, class... P>
-static _FORCE_INLINE_ void vc_change_return_type(void (T::*method)(P...), Variant *v) {
-	VariantInternal::clear(v);
-}
-
-template <class T, class... P>
-static _FORCE_INLINE_ void vc_change_return_type(void (T::*method)(P...) const, Variant *v) {
-	VariantInternal::clear(v);
-}
-
-template <class R, class... P>
-static _FORCE_INLINE_ void vc_change_return_type(R (*method)(P...), Variant *v) {
-	VariantTypeAdjust<R>::adjust(v);
-}
-
-template <class... P>
-static _FORCE_INLINE_ void vc_change_return_type(void (*method)(P...), Variant *v) {
-	VariantInternal::clear(v);
-}
-
-template <class R, class T, class... P>
 static _FORCE_INLINE_ int vc_get_argument_count(R (T::*method)(P...)) {
 	return sizeof...(P);
 }
@@ -333,7 +303,6 @@ static _FORCE_INLINE_ Variant::Type vc_get_base_type(void (T::*method)(P...) con
 			vc_method_call(m_method_ptr, base, p_args, p_argcount, r_ret, p_defvals, r_error);                                                                    \
 		}                                                                                                                                                         \
 		static void validated_call(Variant *base, const Variant **p_args, int p_argcount, Variant *r_ret) {                                                       \
-			vc_change_return_type(m_method_ptr, r_ret);                                                                                                           \
 			vc_validated_call(m_method_ptr, base, p_args, r_ret);                                                                                                 \
 		}                                                                                                                                                         \
 		static void ptrcall(void *p_base, const void **p_args, void *r_ret, int p_argcount) {                                                                     \
@@ -384,7 +353,6 @@ static _FORCE_INLINE_ void vc_static_ptrcall(void (*method)(P...), const void **
 			vc_static_method_call(m_method_ptr, p_args, p_argcount, r_ret, p_defvals, r_error);                                                                   \
 		}                                                                                                                                                         \
 		static void validated_call(Variant *base, const Variant **p_args, int p_argcount, Variant *r_ret) {                                                       \
-			vc_change_return_type(m_method_ptr, r_ret);                                                                                                           \
 			vc_validated_static_call(m_method_ptr, p_args, r_ret);                                                                                                \
 		}                                                                                                                                                         \
 		static void ptrcall(void *p_base, const void **p_args, void *r_ret, int p_argcount) {                                                                     \
@@ -435,7 +403,6 @@ static _FORCE_INLINE_ void vc_ptrcall(void (*method)(T *, P...), void *p_base, c
 			vc_method_call_static(m_method_ptr, base, p_args, p_argcount, r_ret, p_defvals, r_error);                                                             \
 		}                                                                                                                                                         \
 		static void validated_call(Variant *base, const Variant **p_args, int p_argcount, Variant *r_ret) {                                                       \
-			vc_change_return_type(m_method_ptr, r_ret);                                                                                                           \
 			vc_validated_call_static(m_method_ptr, base, p_args, r_ret);                                                                                          \
 		}                                                                                                                                                         \
 		static void ptrcall(void *p_base, const void **p_args, void *r_ret, int p_argcount) {                                                                     \
@@ -533,7 +500,7 @@ struct _VariantCall {
 			const uint8_t *r = p_instance->ptr();
 			CharString cs;
 			cs.resize(p_instance->size() + 1);
-			copymem(cs.ptrw(), r, p_instance->size());
+			memcpy(cs.ptrw(), r, p_instance->size());
 			cs[p_instance->size()] = 0;
 
 			s = cs.get_data();
@@ -1680,6 +1647,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(Array, resize, sarray("size"), varray());
 	bind_method(Array, insert, sarray("position", "value"), varray());
 	bind_method(Array, remove, sarray("position"), varray());
+	bind_method(Array, fill, sarray("value"), varray());
 	bind_method(Array, erase, sarray("value"), varray());
 	bind_method(Array, front, sarray(), varray());
 	bind_method(Array, back, sarray(), varray());
@@ -1710,6 +1678,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(PackedByteArray, append_array, sarray("array"), varray());
 	bind_method(PackedByteArray, remove, sarray("index"), varray());
 	bind_method(PackedByteArray, insert, sarray("at_index", "value"), varray());
+	bind_method(PackedByteArray, fill, sarray("value"), varray());
 	bind_method(PackedByteArray, resize, sarray("new_size"), varray());
 	bind_method(PackedByteArray, has, sarray("value"), varray());
 	bind_method(PackedByteArray, reverse, sarray(), varray());
@@ -1764,6 +1733,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(PackedInt32Array, append_array, sarray("array"), varray());
 	bind_method(PackedInt32Array, remove, sarray("index"), varray());
 	bind_method(PackedInt32Array, insert, sarray("at_index", "value"), varray());
+	bind_method(PackedInt32Array, fill, sarray("value"), varray());
 	bind_method(PackedInt32Array, resize, sarray("new_size"), varray());
 	bind_method(PackedInt32Array, has, sarray("value"), varray());
 	bind_method(PackedInt32Array, reverse, sarray(), varray());
@@ -1782,6 +1752,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(PackedInt64Array, append_array, sarray("array"), varray());
 	bind_method(PackedInt64Array, remove, sarray("index"), varray());
 	bind_method(PackedInt64Array, insert, sarray("at_index", "value"), varray());
+	bind_method(PackedInt64Array, fill, sarray("value"), varray());
 	bind_method(PackedInt64Array, resize, sarray("new_size"), varray());
 	bind_method(PackedInt64Array, has, sarray("value"), varray());
 	bind_method(PackedInt64Array, reverse, sarray(), varray());
@@ -1800,6 +1771,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(PackedFloat32Array, append_array, sarray("array"), varray());
 	bind_method(PackedFloat32Array, remove, sarray("index"), varray());
 	bind_method(PackedFloat32Array, insert, sarray("at_index", "value"), varray());
+	bind_method(PackedFloat32Array, fill, sarray("value"), varray());
 	bind_method(PackedFloat32Array, resize, sarray("new_size"), varray());
 	bind_method(PackedFloat32Array, has, sarray("value"), varray());
 	bind_method(PackedFloat32Array, reverse, sarray(), varray());
@@ -1818,6 +1790,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(PackedFloat64Array, append_array, sarray("array"), varray());
 	bind_method(PackedFloat64Array, remove, sarray("index"), varray());
 	bind_method(PackedFloat64Array, insert, sarray("at_index", "value"), varray());
+	bind_method(PackedFloat64Array, fill, sarray("value"), varray());
 	bind_method(PackedFloat64Array, resize, sarray("new_size"), varray());
 	bind_method(PackedFloat64Array, has, sarray("value"), varray());
 	bind_method(PackedFloat64Array, reverse, sarray(), varray());
@@ -1836,6 +1809,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(PackedStringArray, append_array, sarray("array"), varray());
 	bind_method(PackedStringArray, remove, sarray("index"), varray());
 	bind_method(PackedStringArray, insert, sarray("at_index", "value"), varray());
+	bind_method(PackedStringArray, fill, sarray("value"), varray());
 	bind_method(PackedStringArray, resize, sarray("new_size"), varray());
 	bind_method(PackedStringArray, has, sarray("value"), varray());
 	bind_method(PackedStringArray, reverse, sarray(), varray());
@@ -1854,6 +1828,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(PackedVector2Array, append_array, sarray("array"), varray());
 	bind_method(PackedVector2Array, remove, sarray("index"), varray());
 	bind_method(PackedVector2Array, insert, sarray("at_index", "value"), varray());
+	bind_method(PackedVector2Array, fill, sarray("value"), varray());
 	bind_method(PackedVector2Array, resize, sarray("new_size"), varray());
 	bind_method(PackedVector2Array, has, sarray("value"), varray());
 	bind_method(PackedVector2Array, reverse, sarray(), varray());
@@ -1872,6 +1847,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(PackedVector3Array, append_array, sarray("array"), varray());
 	bind_method(PackedVector3Array, remove, sarray("index"), varray());
 	bind_method(PackedVector3Array, insert, sarray("at_index", "value"), varray());
+	bind_method(PackedVector3Array, fill, sarray("value"), varray());
 	bind_method(PackedVector3Array, resize, sarray("new_size"), varray());
 	bind_method(PackedVector3Array, has, sarray("value"), varray());
 	bind_method(PackedVector3Array, reverse, sarray(), varray());
@@ -1890,6 +1866,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(PackedColorArray, append_array, sarray("array"), varray());
 	bind_method(PackedColorArray, remove, sarray("index"), varray());
 	bind_method(PackedColorArray, insert, sarray("at_index", "value"), varray());
+	bind_method(PackedColorArray, fill, sarray("value"), varray());
 	bind_method(PackedColorArray, resize, sarray("new_size"), varray());
 	bind_method(PackedColorArray, has, sarray("value"), varray());
 	bind_method(PackedColorArray, reverse, sarray(), varray());

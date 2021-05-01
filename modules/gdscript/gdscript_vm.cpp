@@ -33,6 +33,7 @@
 #include "core/core_string_names.h"
 #include "core/os/os.h"
 #include "gdscript.h"
+#include "gdscript_lambda_callable.h"
 
 Variant *GDScriptFunction::_get_variant(int p_address, GDScriptInstance *p_instance, Variant *p_stack, String &r_error) const {
 	int address = p_address & ADDR_MASK;
@@ -232,6 +233,7 @@ String GDScriptFunction::_get_call_error(const Callable::CallError &p_err, const
 		&&OPCODE_CALL_PTRCALL_PACKED_COLOR_ARRAY,    \
 		&&OPCODE_AWAIT,                              \
 		&&OPCODE_AWAIT_RESUME,                       \
+		&&OPCODE_CREATE_LAMBDA,                      \
 		&&OPCODE_JUMP,                               \
 		&&OPCODE_JUMP_IF,                            \
 		&&OPCODE_JUMP_IF_NOT,                        \
@@ -282,6 +284,40 @@ String GDScriptFunction::_get_call_error(const Callable::CallError &p_err, const
 		&&OPCODE_ITERATE_PACKED_COLOR_ARRAY,         \
 		&&OPCODE_ITERATE_OBJECT,                     \
 		&&OPCODE_STORE_NAMED_GLOBAL,                 \
+		&&OPCODE_TYPE_ADJUST_BOOL,                   \
+		&&OPCODE_TYPE_ADJUST_INT,                    \
+		&&OPCODE_TYPE_ADJUST_FLOAT,                  \
+		&&OPCODE_TYPE_ADJUST_STRING,                 \
+		&&OPCODE_TYPE_ADJUST_VECTOR2,                \
+		&&OPCODE_TYPE_ADJUST_VECTOR2I,               \
+		&&OPCODE_TYPE_ADJUST_RECT2,                  \
+		&&OPCODE_TYPE_ADJUST_RECT2I,                 \
+		&&OPCODE_TYPE_ADJUST_VECTOR3,                \
+		&&OPCODE_TYPE_ADJUST_VECTOR3I,               \
+		&&OPCODE_TYPE_ADJUST_TRANSFORM2D,            \
+		&&OPCODE_TYPE_ADJUST_PLANE,                  \
+		&&OPCODE_TYPE_ADJUST_QUAT,                   \
+		&&OPCODE_TYPE_ADJUST_AABB,                   \
+		&&OPCODE_TYPE_ADJUST_BASIS,                  \
+		&&OPCODE_TYPE_ADJUST_TRANSFORM,              \
+		&&OPCODE_TYPE_ADJUST_COLOR,                  \
+		&&OPCODE_TYPE_ADJUST_STRING_NAME,            \
+		&&OPCODE_TYPE_ADJUST_NODE_PATH,              \
+		&&OPCODE_TYPE_ADJUST_RID,                    \
+		&&OPCODE_TYPE_ADJUST_OBJECT,                 \
+		&&OPCODE_TYPE_ADJUST_CALLABLE,               \
+		&&OPCODE_TYPE_ADJUST_SIGNAL,                 \
+		&&OPCODE_TYPE_ADJUST_DICTIONARY,             \
+		&&OPCODE_TYPE_ADJUST_ARRAY,                  \
+		&&OPCODE_TYPE_ADJUST_PACKED_BYTE_ARRAY,      \
+		&&OPCODE_TYPE_ADJUST_PACKED_INT32_ARRAY,     \
+		&&OPCODE_TYPE_ADJUST_PACKED_INT64_ARRAY,     \
+		&&OPCODE_TYPE_ADJUST_PACKED_FLOAT32_ARRAY,   \
+		&&OPCODE_TYPE_ADJUST_PACKED_FLOAT64_ARRAY,   \
+		&&OPCODE_TYPE_ADJUST_PACKED_STRING_ARRAY,    \
+		&&OPCODE_TYPE_ADJUST_PACKED_VECTOR2_ARRAY,   \
+		&&OPCODE_TYPE_ADJUST_PACKED_VECTOR3_ARRAY,   \
+		&&OPCODE_TYPE_ADJUST_PACKED_COLOR_ARRAY,     \
 		&&OPCODE_ASSERT,                             \
 		&&OPCODE_BREAKPOINT,                         \
 		&&OPCODE_LINE,                               \
@@ -1418,13 +1454,17 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 				if (err.error != Callable::CallError::CALL_OK) {
 					String methodstr = *methodname;
 					String basestr = _get_var_type(base);
+					bool is_callable = false;
 
 					if (methodstr == "call") {
-						if (argc >= 1) {
+						if (argc >= 1 && base->get_type() != Variant::CALLABLE) {
 							methodstr = String(*argptrs[0]) + " (via call)";
 							if (err.error == Callable::CallError::CALL_ERROR_INVALID_ARGUMENT) {
 								err.argument += 1;
 							}
+						} else {
+							methodstr = base->operator String() + " (Callable)";
+							is_callable = true;
 						}
 					} else if (methodstr == "free") {
 						if (err.error == Callable::CallError::CALL_ERROR_INVALID_METHOD) {
@@ -1444,7 +1484,7 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 							}
 						}
 					}
-					err_text = _get_call_error(err, "function '" + methodstr + "' in base '" + basestr + "'", (const Variant **)argptrs);
+					err_text = _get_call_error(err, "function '" + methodstr + (is_callable ? "" : "' in base '" + basestr) + "'", (const Variant **)argptrs);
 					OPCODE_BREAK;
 				}
 #endif
@@ -2020,6 +2060,34 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 				GET_INSTRUCTION_ARG(result, 0);
 				*result = p_state->result;
 				ip += 2;
+			}
+			DISPATCH_OPCODE;
+
+			OPCODE(OPCODE_CREATE_LAMBDA) {
+				CHECK_SPACE(2 + instr_arg_count);
+
+				ip += instr_arg_count;
+
+				int captures_count = _code_ptr[ip + 1];
+				GD_ERR_BREAK(captures_count < 0);
+
+				int lambda_index = _code_ptr[ip + 2];
+				GD_ERR_BREAK(lambda_index < 0 || lambda_index >= _lambdas_count);
+				GDScriptFunction *lambda = _lambdas_ptr[lambda_index];
+
+				Vector<Variant> captures;
+				captures.resize(captures_count);
+				for (int i = 0; i < captures_count; i++) {
+					GET_INSTRUCTION_ARG(arg, i);
+					captures.write[i] = *arg;
+				}
+
+				GDScriptLambdaCallable *callable = memnew(GDScriptLambdaCallable(Ref<GDScript>(script), lambda, captures));
+
+				GET_INSTRUCTION_ARG(result, captures_count);
+				*result = Callable(callable);
+
+				ip += 3;
 			}
 			DISPATCH_OPCODE;
 
@@ -2972,6 +3040,50 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 				ip += 3;
 			}
 			DISPATCH_OPCODE;
+
+#define OPCODE_TYPE_ADJUST(m_v_type, m_c_type)    \
+	OPCODE(OPCODE_TYPE_ADJUST_##m_v_type) {       \
+		CHECK_SPACE(2);                           \
+		GET_INSTRUCTION_ARG(arg, 0);              \
+		VariantTypeAdjust<m_c_type>::adjust(arg); \
+		ip += 2;                                  \
+	}                                             \
+	DISPATCH_OPCODE
+
+			OPCODE_TYPE_ADJUST(BOOL, bool);
+			OPCODE_TYPE_ADJUST(INT, int64_t);
+			OPCODE_TYPE_ADJUST(FLOAT, double);
+			OPCODE_TYPE_ADJUST(STRING, String);
+			OPCODE_TYPE_ADJUST(VECTOR2, Vector2);
+			OPCODE_TYPE_ADJUST(VECTOR2I, Vector2i);
+			OPCODE_TYPE_ADJUST(RECT2, Rect2);
+			OPCODE_TYPE_ADJUST(RECT2I, Rect2i);
+			OPCODE_TYPE_ADJUST(VECTOR3, Vector3);
+			OPCODE_TYPE_ADJUST(VECTOR3I, Vector3i);
+			OPCODE_TYPE_ADJUST(TRANSFORM2D, Transform2D);
+			OPCODE_TYPE_ADJUST(PLANE, Plane);
+			OPCODE_TYPE_ADJUST(QUAT, Quat);
+			OPCODE_TYPE_ADJUST(AABB, AABB);
+			OPCODE_TYPE_ADJUST(BASIS, Basis);
+			OPCODE_TYPE_ADJUST(TRANSFORM, Transform);
+			OPCODE_TYPE_ADJUST(COLOR, Color);
+			OPCODE_TYPE_ADJUST(STRING_NAME, StringName);
+			OPCODE_TYPE_ADJUST(NODE_PATH, NodePath);
+			OPCODE_TYPE_ADJUST(RID, RID);
+			OPCODE_TYPE_ADJUST(OBJECT, Object *);
+			OPCODE_TYPE_ADJUST(CALLABLE, Callable);
+			OPCODE_TYPE_ADJUST(SIGNAL, Signal);
+			OPCODE_TYPE_ADJUST(DICTIONARY, Dictionary);
+			OPCODE_TYPE_ADJUST(ARRAY, Array);
+			OPCODE_TYPE_ADJUST(PACKED_BYTE_ARRAY, PackedByteArray);
+			OPCODE_TYPE_ADJUST(PACKED_INT32_ARRAY, PackedInt32Array);
+			OPCODE_TYPE_ADJUST(PACKED_INT64_ARRAY, PackedInt64Array);
+			OPCODE_TYPE_ADJUST(PACKED_FLOAT32_ARRAY, PackedFloat32Array);
+			OPCODE_TYPE_ADJUST(PACKED_FLOAT64_ARRAY, PackedFloat64Array);
+			OPCODE_TYPE_ADJUST(PACKED_STRING_ARRAY, PackedStringArray);
+			OPCODE_TYPE_ADJUST(PACKED_VECTOR2_ARRAY, PackedVector2Array);
+			OPCODE_TYPE_ADJUST(PACKED_VECTOR3_ARRAY, PackedVector3Array);
+			OPCODE_TYPE_ADJUST(PACKED_COLOR_ARRAY, PackedColorArray);
 
 			OPCODE(OPCODE_ASSERT) {
 				CHECK_SPACE(3);

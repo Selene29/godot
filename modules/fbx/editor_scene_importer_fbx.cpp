@@ -104,7 +104,7 @@ Node3D *EditorSceneImporterFBX::import_scene(const String &p_path, uint32_t p_fl
 		bool is_binary = false;
 		data.resize(f->get_len());
 
-		ERR_FAIL_COND_V(data.size() < 64, NULL);
+		ERR_FAIL_COND_V(data.size() < 64, nullptr);
 
 		f->get_buffer(data.ptrw(), data.size());
 		PackedByteArray fbx_header;
@@ -1013,7 +1013,6 @@ Node3D *EditorSceneImporterFBX::_generate_scene(
 						const uint64_t target_id = track->key();
 						int track_idx = animation->add_track(Animation::TYPE_TRANSFORM);
 
-						// animation->track_set_path(track_idx, node_path);
 						// animation->track_set_path(track_idx, node_path);
 						Ref<FBXBone> bone;
 
