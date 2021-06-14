@@ -31,9 +31,9 @@
 #include "gdscript_parser.h"
 
 #include "core/config/project_settings.h"
+#include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/math/math_defs.h"
-#include "core/os/file_access.h"
 #include "gdscript.h"
 
 #ifdef DEBUG_ENABLED
@@ -61,9 +61,9 @@ Variant::Type GDScriptParser::get_builtin_type(const StringName &p_type) {
 		builtin_types["Vector3i"] = Variant::VECTOR3I;
 		builtin_types["AABB"] = Variant::AABB;
 		builtin_types["Plane"] = Variant::PLANE;
-		builtin_types["Quat"] = Variant::QUAT;
+		builtin_types["Quaternion"] = Variant::QUATERNION;
 		builtin_types["Basis"] = Variant::BASIS;
-		builtin_types["Transform"] = Variant::TRANSFORM;
+		builtin_types["Transform"] = Variant::TRANSFORM3D;
 		builtin_types["Color"] = Variant::COLOR;
 		builtin_types["RID"] = Variant::RID;
 		builtin_types["Object"] = Variant::OBJECT;
@@ -1173,7 +1173,7 @@ GDScriptParser::EnumNode *GDScriptParser::parse_enum() {
 	consume(GDScriptTokenizer::Token::BRACE_CLOSE, R"(Expected closing "}" for enum.)");
 
 #ifdef TOOLS_ENABLED
-	// Enum values documentaion.
+	// Enum values documentation.
 	for (int i = 0; i < enum_node->values.size(); i++) {
 		if (i == enum_node->values.size() - 1) {
 			// If close bracket is same line as last value.

@@ -1833,7 +1833,7 @@ bool SceneTreeDock::_is_collapsed_recursive(TreeItem *p_item) const {
 		TreeItem *item = needs_check.back()->get();
 		needs_check.pop_back();
 
-		TreeItem *child = item->get_children();
+		TreeItem *child = item->get_first_child();
 		is_branch_collapsed = item->is_collapsed() && child;
 
 		if (is_branch_collapsed) {
@@ -1857,7 +1857,7 @@ void SceneTreeDock::_set_collapsed_recursive(TreeItem *p_item, bool p_collapsed)
 
 		item->set_collapsed(p_collapsed);
 
-		TreeItem *child = item->get_children();
+		TreeItem *child = item->get_first_child();
 		while (child) {
 			to_collapse.push_back(child);
 			child = child->get_next();
@@ -2587,14 +2587,16 @@ void SceneTreeDock::_tree_rmb(const Vector2 &p_menu_pos) {
 		}
 	}
 
-	if (profile_allow_script_editing) {
+	if (profile_allow_editing) {
 		menu->add_shortcut(ED_GET_SHORTCUT("scene_tree/cut_node"), TOOL_CUT);
 		menu->add_shortcut(ED_GET_SHORTCUT("scene_tree/copy_node"), TOOL_COPY);
 		if (selection.size() == 1 && !node_clipboard.is_empty()) {
 			menu->add_shortcut(ED_GET_SHORTCUT("scene_tree/paste_node"), TOOL_PASTE);
 		}
 		menu->add_separator();
+	}
 
+	if (profile_allow_script_editing) {
 		bool add_separator = false;
 
 		if (full_selection.size() == 1) {
@@ -2622,7 +2624,7 @@ void SceneTreeDock::_tree_rmb(const Vector2 &p_menu_pos) {
 			}
 		}
 
-		if (add_separator) {
+		if (add_separator && profile_allow_editing) {
 			menu->add_separator();
 		}
 	}
@@ -2957,6 +2959,7 @@ void SceneTreeDock::_clear_clipboard() {
 void SceneTreeDock::_create_remap_for_node(Node *p_node, Map<RES, RES> &r_remap) {
 	List<PropertyInfo> props;
 	p_node->get_property_list(&props);
+	bool is_instanced = EditorPropertyRevert::may_node_be_in_instance(p_node);
 
 	for (List<PropertyInfo>::Element *E = props.front(); E; E = E->next()) {
 		if (!(E->get().usage & PROPERTY_USAGE_STORAGE)) {
@@ -2967,6 +2970,15 @@ void SceneTreeDock::_create_remap_for_node(Node *p_node, Map<RES, RES> &r_remap)
 		if (v.is_ref()) {
 			RES res = v;
 			if (res.is_valid()) {
+				if (is_instanced) {
+					Variant orig;
+					if (EditorPropertyRevert::get_instanced_node_original_property(p_node, E->get().name, orig)) {
+						if (!EditorPropertyRevert::is_node_property_different(p_node, v, orig)) {
+							continue;
+						}
+					}
+				}
+
 				if ((res->get_path() == "" || res->get_path().find("::") > -1) && !r_remap.has(res)) {
 					_create_remap_for_resource(res, r_remap);
 				}
@@ -3042,7 +3054,7 @@ SceneTreeDock::SceneTreeDock(EditorNode *p_editor, Node *p_scene_root, EditorSel
 	ED_SHORTCUT("scene_tree/rename", TTR("Rename"), KEY_F2);
 	ED_SHORTCUT("scene_tree/batch_rename", TTR("Batch Rename"), KEY_MASK_SHIFT | KEY_F2);
 	ED_SHORTCUT("scene_tree/add_child_node", TTR("Add Child Node"), KEY_MASK_CMD | KEY_A);
-	ED_SHORTCUT("scene_tree/instance_scene", TTR("Instance Child Scene"));
+	ED_SHORTCUT("scene_tree/instance_scene", TTR("Instance Child Scene"), KEY_MASK_CMD | KEY_MASK_SHIFT | KEY_A);
 	ED_SHORTCUT("scene_tree/expand_collapse_all", TTR("Expand/Collapse All"));
 	ED_SHORTCUT("scene_tree/cut_node", TTR("Cut"), KEY_MASK_CMD | KEY_X);
 	ED_SHORTCUT("scene_tree/copy_node", TTR("Copy"), KEY_MASK_CMD | KEY_C);

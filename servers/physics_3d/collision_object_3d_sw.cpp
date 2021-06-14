@@ -32,7 +32,7 @@
 #include "servers/physics_3d/physics_server_3d_sw.h"
 #include "space_3d_sw.h"
 
-void CollisionObject3DSW::add_shape(Shape3DSW *p_shape, const Transform &p_transform, bool p_disabled) {
+void CollisionObject3DSW::add_shape(Shape3DSW *p_shape, const Transform3D &p_transform, bool p_disabled) {
 	Shape s;
 	s.shape = p_shape;
 	s.xform = p_transform;
@@ -62,7 +62,7 @@ void CollisionObject3DSW::set_shape(int p_index, Shape3DSW *p_shape) {
 	//_shapes_changed();
 }
 
-void CollisionObject3DSW::set_shape_transform(int p_index, const Transform &p_transform) {
+void CollisionObject3DSW::set_shape_transform(int p_index, const Transform3D &p_transform) {
 	ERR_FAIL_INDEX(p_index, shapes.size());
 
 	shapes.write[p_index].xform = p_transform;
@@ -146,22 +146,23 @@ void CollisionObject3DSW::_update_shapes() {
 
 	for (int i = 0; i < shapes.size(); i++) {
 		Shape &s = shapes.write[i];
-		if (s.bpid == 0) {
-			s.bpid = space->get_broadphase()->create(this, i);
-			space->get_broadphase()->set_static(s.bpid, _static);
-		}
 
 		//not quite correct, should compute the next matrix..
 		AABB shape_aabb = s.shape->get_aabb();
-		Transform xform = transform * s.xform;
+		Transform3D xform = transform * s.xform;
 		shape_aabb = xform.xform(shape_aabb);
+		shape_aabb.grow_by((s.aabb_cache.size.x + s.aabb_cache.size.y) * 0.5 * 0.05);
 		s.aabb_cache = shape_aabb;
-		s.aabb_cache = s.aabb_cache.grow((s.aabb_cache.size.x + s.aabb_cache.size.y) * 0.5 * 0.05);
 
 		Vector3 scale = xform.get_basis().get_scale();
 		s.area_cache = s.shape->get_area() * scale.x * scale.y * scale.z;
 
-		space->get_broadphase()->move(s.bpid, s.aabb_cache);
+		if (s.bpid == 0) {
+			s.bpid = space->get_broadphase()->create(this, i, shape_aabb, _static);
+			space->get_broadphase()->set_static(s.bpid, _static);
+		}
+
+		space->get_broadphase()->move(s.bpid, shape_aabb);
 	}
 }
 
@@ -172,17 +173,18 @@ void CollisionObject3DSW::_update_shapes_with_motion(const Vector3 &p_motion) {
 
 	for (int i = 0; i < shapes.size(); i++) {
 		Shape &s = shapes.write[i];
-		if (s.bpid == 0) {
-			s.bpid = space->get_broadphase()->create(this, i);
-			space->get_broadphase()->set_static(s.bpid, _static);
-		}
 
 		//not quite correct, should compute the next matrix..
 		AABB shape_aabb = s.shape->get_aabb();
-		Transform xform = transform * s.xform;
+		Transform3D xform = transform * s.xform;
 		shape_aabb = xform.xform(shape_aabb);
-		shape_aabb = shape_aabb.merge(AABB(shape_aabb.position + p_motion, shape_aabb.size)); //use motion
+		shape_aabb.merge_with(AABB(shape_aabb.position + p_motion, shape_aabb.size)); //use motion
 		s.aabb_cache = shape_aabb;
+
+		if (s.bpid == 0) {
+			s.bpid = space->get_broadphase()->create(this, i, shape_aabb, _static);
+			space->get_broadphase()->set_static(s.bpid, _static);
+		}
 
 		space->get_broadphase()->move(s.bpid, shape_aabb);
 	}

@@ -236,8 +236,8 @@ public:
 	AnimationTrackEdit();
 };
 
-class AnimationTrackEditPlugin : public Reference {
-	GDCLASS(AnimationTrackEditPlugin, Reference);
+class AnimationTrackEditPlugin : public RefCounted {
+	GDCLASS(AnimationTrackEditPlugin, RefCounted);
 
 public:
 	virtual AnimationTrackEdit *create_value_track_edit(Object *p_object, Variant::Type p_type, const String &p_property, PropertyHint p_hint, const String &p_hint_string, int p_usage);
@@ -328,7 +328,7 @@ class AnimationTrackEditor : public VBoxContainer {
 	void _update_tracks();
 
 	void _name_limit_changed();
-	void _timeline_changed(float p_new_pos, bool p_drag);
+	void _timeline_changed(float p_new_pos, bool p_drag, bool p_timeline_only = false);
 	void _track_remove_request(int p_track);
 	void _track_grab_focus(int p_track);
 
@@ -526,7 +526,7 @@ public:
 	void set_anim_pos(float p_pos);
 	void insert_node_value_key(Node *p_node, const String &p_property, const Variant &p_value, bool p_only_if_exists = false);
 	void insert_value_key(const String &p_property, const Variant &p_value, bool p_advance);
-	void insert_transform_key(Node3D *p_node, const String &p_sub, const Transform &p_xform);
+	void insert_transform_key(Node3D *p_node, const String &p_sub, const Transform3D &p_xform);
 
 	void show_select_node_warning(bool p_show);
 

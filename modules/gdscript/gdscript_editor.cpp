@@ -32,7 +32,7 @@
 
 #include "core/config/engine.h"
 #include "core/core_constants.h"
-#include "core/os/file_access.h"
+#include "core/io/file_access.h"
 #include "gdscript_analyzer.h"
 #include "gdscript_compiler.h"
 #include "gdscript_parser.h"
@@ -738,7 +738,13 @@ static void _list_available_types(bool p_inherit_only, GDScriptParser::Completio
 
 static void _find_identifiers_in_suite(const GDScriptParser::SuiteNode *p_suite, Map<String, ScriptCodeCompletionOption> &r_result) {
 	for (int i = 0; i < p_suite->locals.size(); i++) {
-		ScriptCodeCompletionOption option(p_suite->locals[i].name, ScriptCodeCompletionOption::KIND_VARIABLE);
+		ScriptCodeCompletionOption option;
+		if (p_suite->locals[i].type == GDScriptParser::SuiteNode::Local::CONSTANT) {
+			option = ScriptCodeCompletionOption(p_suite->locals[i].name, ScriptCodeCompletionOption::KIND_CONSTANT);
+			option.default_value = p_suite->locals[i].constant->initializer->reduced_value;
+		} else {
+			option = ScriptCodeCompletionOption(p_suite->locals[i].name, ScriptCodeCompletionOption::KIND_VARIABLE);
+		}
 		r_result.insert(option.display, option);
 	}
 	if (p_suite->parent_block) {
@@ -2867,7 +2873,7 @@ static Error _lookup_symbol_from_base(const GDScriptParser::DataType &p_base, co
 				StringName parent = ClassDB::get_parent_class(class_name);
 				if (parent != StringName()) {
 					if (String(parent).begins_with("_")) {
-						base_type.native_type = String(parent).right(1);
+						base_type.native_type = String(parent).substr(1);
 					} else {
 						base_type.native_type = parent;
 					}
@@ -2993,6 +2999,7 @@ Error GDScriptLanguage::lookup_code(const String &p_code, const String &p_symbol
 			is_function = true;
 			[[fallthrough]];
 		}
+		case GDScriptParser::COMPLETION_CALL_ARGUMENTS:
 		case GDScriptParser::COMPLETION_IDENTIFIER: {
 			GDScriptParser::DataType base_type;
 			if (context.current_class) {
@@ -3060,7 +3067,7 @@ Error GDScriptLanguage::lookup_code(const String &p_code, const String &p_symbol
 
 							// proxy class remove the underscore.
 							if (r_result.class_name.begins_with("_")) {
-								r_result.class_name = r_result.class_name.right(1);
+								r_result.class_name = r_result.class_name.substr(1);
 							}
 							return OK;
 						}

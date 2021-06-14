@@ -84,7 +84,8 @@ void DisplayServerWindows::alert(const String &p_alert, const String &p_title) {
 }
 
 void DisplayServerWindows::_set_mouse_mode_impl(MouseMode p_mode) {
-	if (p_mode == MOUSE_MODE_CAPTURED || p_mode == MOUSE_MODE_CONFINED) {
+	if (p_mode == MOUSE_MODE_CAPTURED || p_mode == MOUSE_MODE_CONFINED || p_mode == MOUSE_MODE_CONFINED_HIDDEN) {
+		// Mouse is grabbed (captured or confined).
 		WindowData &wd = windows[MAIN_WINDOW_ID];
 
 		RECT clipRect;
@@ -100,11 +101,12 @@ void DisplayServerWindows::_set_mouse_mode_impl(MouseMode p_mode) {
 			SetCapture(wd.hWnd);
 		}
 	} else {
+		// Mouse is free to move around (not captured or confined).
 		ReleaseCapture();
 		ClipCursor(nullptr);
 	}
 
-	if (p_mode == MOUSE_MODE_CAPTURED || p_mode == MOUSE_MODE_HIDDEN) {
+	if (p_mode == MOUSE_MODE_HIDDEN || p_mode == MOUSE_MODE_CAPTURED || p_mode == MOUSE_MODE_CONFINED_HIDDEN) {
 		if (hCursor == nullptr) {
 			hCursor = SetCursor(nullptr);
 		} else {
@@ -715,7 +717,7 @@ void DisplayServerWindows::window_set_position(const Point2i &p_position, Window
 	MoveWindow(wd.hWnd, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, TRUE);
 #endif
 	// Don't let the mouse leave the window when moved
-	if (mouse_mode == MOUSE_MODE_CONFINED) {
+	if (mouse_mode == MOUSE_MODE_CONFINED || mouse_mode == MOUSE_MODE_CONFINED_HIDDEN) {
 		RECT rect;
 		GetClientRect(wd.hWnd, &rect);
 		ClientToScreen(wd.hWnd, (POINT *)&rect.left);
@@ -841,7 +843,7 @@ void DisplayServerWindows::window_set_size(const Size2i p_size, WindowID p_windo
 	MoveWindow(wd.hWnd, rect.left, rect.top, w, h, TRUE);
 
 	// Don't let the mouse leave the window when resizing to a smaller resolution
-	if (mouse_mode == MOUSE_MODE_CONFINED) {
+	if (mouse_mode == MOUSE_MODE_CONFINED || mouse_mode == MOUSE_MODE_CONFINED_HIDDEN) {
 		RECT crect;
 		GetClientRect(wd.hWnd, &crect);
 		ClientToScreen(wd.hWnd, (POINT *)&crect.left);
@@ -1119,7 +1121,7 @@ bool DisplayServerWindows::window_can_draw(WindowID p_window) const {
 
 	ERR_FAIL_COND_V(!windows.has(p_window), false);
 	const WindowData &wd = windows[p_window];
-	return wd.minimized;
+	return !wd.minimized;
 }
 
 bool DisplayServerWindows::can_any_window_draw() const {
@@ -1889,7 +1891,7 @@ LRESULT DisplayServerWindows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 				// Run a timer to prevent event catching warning if the focused window is closing.
 				windows[window_id].focus_timer_id = SetTimer(windows[window_id].hWnd, 2, USER_TIMER_MINIMUM, (TIMERPROC) nullptr);
 			}
-			return 0; // Return  To The Message Loop
+			return 0; // Return To The Message Loop
 		}
 		case WM_GETMINMAXINFO: {
 			if (windows[window_id].resizable && !windows[window_id].fullscreen) {
@@ -1966,9 +1968,9 @@ LRESULT DisplayServerWindows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 				mm.instance();
 
 				mm->set_window_id(window_id);
-				mm->set_control(control_mem);
-				mm->set_shift(shift_mem);
-				mm->set_alt(alt_mem);
+				mm->set_ctrl_pressed(control_mem);
+				mm->set_shift_pressed(shift_mem);
+				mm->set_alt_pressed(alt_mem);
 
 				mm->set_pressure((raw->data.mouse.ulButtons & RI_MOUSE_LEFT_BUTTON_DOWN) ? 1.0f : 0.0f);
 
@@ -2062,9 +2064,9 @@ LRESULT DisplayServerWindows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 					Ref<InputEventMouseMotion> mm;
 					mm.instance();
 					mm->set_window_id(window_id);
-					mm->set_control(GetKeyState(VK_CONTROL) < 0);
-					mm->set_shift(GetKeyState(VK_SHIFT) < 0);
-					mm->set_alt(alt_mem);
+					mm->set_ctrl_pressed(GetKeyState(VK_CONTROL) < 0);
+					mm->set_shift_pressed(GetKeyState(VK_SHIFT) < 0);
+					mm->set_alt_pressed(alt_mem);
 
 					mm->set_pressure(windows[window_id].last_pressure);
 					mm->set_tilt(windows[window_id].last_tilt);
@@ -2189,8 +2191,9 @@ LRESULT DisplayServerWindows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 			}
 
 			// Don't calculate relative mouse movement if we don't have focus in CAPTURED mode.
-			if (!windows[window_id].window_has_focus && mouse_mode == MOUSE_MODE_CAPTURED)
+			if (!windows[window_id].window_has_focus && mouse_mode == MOUSE_MODE_CAPTURED) {
 				break;
+			}
 
 			Ref<InputEventMouseMotion> mm;
 			mm.instance();
@@ -2205,9 +2208,9 @@ LRESULT DisplayServerWindows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 				mm->set_tilt(Vector2((float)pen_info.tiltX / 90, (float)pen_info.tiltY / 90));
 			}
 
-			mm->set_control(GetKeyState(VK_CONTROL) < 0);
-			mm->set_shift(GetKeyState(VK_SHIFT) < 0);
-			mm->set_alt(alt_mem);
+			mm->set_ctrl_pressed(GetKeyState(VK_CONTROL) < 0);
+			mm->set_shift_pressed(GetKeyState(VK_SHIFT) < 0);
+			mm->set_alt_pressed(alt_mem);
 
 			mm->set_button_mask(last_button_state);
 
@@ -2294,15 +2297,16 @@ LRESULT DisplayServerWindows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 			}
 
 			// Don't calculate relative mouse movement if we don't have focus in CAPTURED mode.
-			if (!windows[window_id].window_has_focus && mouse_mode == MOUSE_MODE_CAPTURED)
+			if (!windows[window_id].window_has_focus && mouse_mode == MOUSE_MODE_CAPTURED) {
 				break;
+			}
 
 			Ref<InputEventMouseMotion> mm;
 			mm.instance();
 			mm->set_window_id(window_id);
-			mm->set_control((wParam & MK_CONTROL) != 0);
-			mm->set_shift((wParam & MK_SHIFT) != 0);
-			mm->set_alt(alt_mem);
+			mm->set_ctrl_pressed((wParam & MK_CONTROL) != 0);
+			mm->set_shift_pressed((wParam & MK_SHIFT) != 0);
+			mm->set_alt_pressed(alt_mem);
 
 			if ((tablet_get_current_driver() == "wintab") && wintab_available && windows[window_id].wtctx) {
 				// Note: WinTab sends both WT_PACKET and WM_xBUTTONDOWN/UP/MOUSEMOVE events, use mouse 1/0 pressure only when last_pressure was not updated recently.
@@ -2412,35 +2416,38 @@ LRESULT DisplayServerWindows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 				case WM_LBUTTONDBLCLK: {
 					mb->set_pressed(true);
 					mb->set_button_index(1);
-					mb->set_doubleclick(true);
+					mb->set_double_click(true);
 				} break;
 				case WM_RBUTTONDBLCLK: {
 					mb->set_pressed(true);
 					mb->set_button_index(2);
-					mb->set_doubleclick(true);
+					mb->set_double_click(true);
 				} break;
 				case WM_MBUTTONDBLCLK: {
 					mb->set_pressed(true);
 					mb->set_button_index(3);
-					mb->set_doubleclick(true);
+					mb->set_double_click(true);
 				} break;
 				case WM_MOUSEWHEEL: {
 					mb->set_pressed(true);
 					int motion = (short)HIWORD(wParam);
-					if (!motion)
+					if (!motion) {
 						return 0;
+					}
 
-					if (motion > 0)
+					if (motion > 0) {
 						mb->set_button_index(MOUSE_BUTTON_WHEEL_UP);
-					else
+					} else {
 						mb->set_button_index(MOUSE_BUTTON_WHEEL_DOWN);
+					}
 
 				} break;
 				case WM_MOUSEHWHEEL: {
 					mb->set_pressed(true);
 					int motion = (short)HIWORD(wParam);
-					if (!motion)
+					if (!motion) {
 						return 0;
+					}
 
 					if (motion < 0) {
 						mb->set_button_index(MOUSE_BUTTON_WHEEL_LEFT);
@@ -2452,39 +2459,43 @@ LRESULT DisplayServerWindows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 				} break;
 				case WM_XBUTTONDOWN: {
 					mb->set_pressed(true);
-					if (HIWORD(wParam) == XBUTTON1)
+					if (HIWORD(wParam) == XBUTTON1) {
 						mb->set_button_index(MOUSE_BUTTON_XBUTTON1);
-					else
+					} else {
 						mb->set_button_index(MOUSE_BUTTON_XBUTTON2);
+					}
 				} break;
 				case WM_XBUTTONUP: {
 					mb->set_pressed(false);
-					if (HIWORD(wParam) == XBUTTON1)
+					if (HIWORD(wParam) == XBUTTON1) {
 						mb->set_button_index(MOUSE_BUTTON_XBUTTON1);
-					else
+					} else {
 						mb->set_button_index(MOUSE_BUTTON_XBUTTON2);
+					}
 				} break;
 				case WM_XBUTTONDBLCLK: {
 					mb->set_pressed(true);
-					if (HIWORD(wParam) == XBUTTON1)
+					if (HIWORD(wParam) == XBUTTON1) {
 						mb->set_button_index(MOUSE_BUTTON_XBUTTON1);
-					else
+					} else {
 						mb->set_button_index(MOUSE_BUTTON_XBUTTON2);
-					mb->set_doubleclick(true);
+					}
+					mb->set_double_click(true);
 				} break;
 				default: {
 					return 0;
 				}
 			}
 
-			mb->set_control((wParam & MK_CONTROL) != 0);
-			mb->set_shift((wParam & MK_SHIFT) != 0);
-			mb->set_alt(alt_mem);
-			//mb->get_alt()=(wParam&MK_MENU)!=0;
-			if (mb->is_pressed())
+			mb->set_ctrl_pressed((wParam & MK_CONTROL) != 0);
+			mb->set_shift_pressed((wParam & MK_SHIFT) != 0);
+			mb->set_alt_pressed(alt_mem);
+			//mb->is_alt_pressed()=(wParam&MK_MENU)!=0;
+			if (mb->is_pressed()) {
 				last_button_state |= (1 << (mb->get_button_index() - 1));
-			else
+			} else {
 				last_button_state &= ~(1 << (mb->get_button_index() - 1));
+			}
 			mb->set_button_mask(last_button_state);
 
 			mb->set_position(Vector2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)));
@@ -2726,7 +2737,7 @@ LRESULT DisplayServerWindows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 		} break;
 		case WM_SETCURSOR: {
 			if (LOWORD(lParam) == HTCLIENT) {
-				if (windows[window_id].window_has_focus && (mouse_mode == MOUSE_MODE_HIDDEN || mouse_mode == MOUSE_MODE_CAPTURED)) {
+				if (windows[window_id].window_has_focus && (mouse_mode == MOUSE_MODE_HIDDEN || mouse_mode == MOUSE_MODE_CAPTURED || mouse_mode == MOUSE_MODE_CONFINED_HIDDEN)) {
 					//Hide the cursor
 					if (hCursor == nullptr) {
 						hCursor = SetCursor(nullptr);
@@ -2835,17 +2846,17 @@ void DisplayServerWindows::_process_key_events() {
 					k.instance();
 
 					k->set_window_id(ke.window_id);
-					k->set_shift(ke.shift);
-					k->set_alt(ke.alt);
-					k->set_control(ke.control);
-					k->set_metakey(ke.meta);
+					k->set_shift_pressed(ke.shift);
+					k->set_alt_pressed(ke.alt);
+					k->set_ctrl_pressed(ke.control);
+					k->set_meta_pressed(ke.meta);
 					k->set_pressed(true);
 					k->set_keycode(KeyMappingWindows::get_keysym(ke.wParam));
 					k->set_physical_keycode(KeyMappingWindows::get_scansym((ke.lParam >> 16) & 0xFF, ke.lParam & (1 << 24)));
 					k->set_unicode(unicode);
 					if (k->get_unicode() && gr_mem) {
-						k->set_alt(false);
-						k->set_control(false);
+						k->set_alt_pressed(false);
+						k->set_ctrl_pressed(false);
 					}
 
 					if (k->get_unicode() < 32)
@@ -2862,10 +2873,10 @@ void DisplayServerWindows::_process_key_events() {
 				k.instance();
 
 				k->set_window_id(ke.window_id);
-				k->set_shift(ke.shift);
-				k->set_alt(ke.alt);
-				k->set_control(ke.control);
-				k->set_metakey(ke.meta);
+				k->set_shift_pressed(ke.shift);
+				k->set_alt_pressed(ke.alt);
+				k->set_ctrl_pressed(ke.control);
+				k->set_meta_pressed(ke.meta);
 
 				k->set_pressed(ke.uMsg == WM_KEYDOWN);
 
@@ -2900,8 +2911,8 @@ void DisplayServerWindows::_process_key_events() {
 					k->set_unicode(unicode);
 				}
 				if (k->get_unicode() && gr_mem) {
-					k->set_alt(false);
-					k->set_control(false);
+					k->set_alt_pressed(false);
+					k->set_ctrl_pressed(false);
 				}
 
 				if (k->get_unicode() < 32)

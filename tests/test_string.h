@@ -299,6 +299,7 @@ TEST_CASE("[String] hex_encode_buffer") {
 TEST_CASE("[String] Substr") {
 	String s = "Killer Baby";
 	CHECK(s.substr(3, 4) == "ler ");
+	CHECK(s.substr(3) == "ler Baby");
 }
 
 TEST_CASE("[String] Find") {
@@ -860,10 +861,10 @@ TEST_CASE("[String] match") {
 }
 
 TEST_CASE("[String] IPVX address to string") {
-	IP_Address ip0("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
-	IP_Address ip(0x0123, 0x4567, 0x89ab, 0xcdef, true);
-	IP_Address ip2("fe80::52e5:49ff:fe93:1baf");
-	IP_Address ip3("::ffff:192.168.0.1");
+	IPAddress ip0("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
+	IPAddress ip(0x0123, 0x4567, 0x89ab, 0xcdef, true);
+	IPAddress ip2("fe80::52e5:49ff:fe93:1baf");
+	IPAddress ip3("::ffff:192.168.0.1");
 	String ip4 = "192.168.0.1";
 	CHECK(ip4.is_valid_ip_address());
 
@@ -1129,7 +1130,7 @@ TEST_CASE("[String] Path functions") {
 		CHECK(String(path[i]).get_basename() == base_name[i]);
 		CHECK(String(path[i]).get_extension() == ext[i]);
 		CHECK(String(path[i]).get_file() == file[i]);
-		CHECK(String(path[i]).is_abs_path() == abs[i]);
+		CHECK(String(path[i]).is_absolute_path() == abs[i]);
 		CHECK(String(path[i]).is_rel_path() != abs[i]);
 		CHECK(String(path[i]).simplify_path().get_base_dir().plus_file(file[i]) == String(path[i]).simplify_path());
 	}
@@ -1252,8 +1253,10 @@ TEST_CASE("[String] Trim") {
 TEST_CASE("[String] Right/Left") {
 	String s = "aaaTestbbb";
 	//                ^
-	CHECK(s.right(6) == "tbbb");
+	CHECK(s.right(6) == "estbbb");
+	CHECK(s.right(-6) == "tbbb");
 	CHECK(s.left(6) == "aaaTes");
+	CHECK(s.left(-6) == "aaaT");
 }
 
 TEST_CASE("[String] Repeat") {

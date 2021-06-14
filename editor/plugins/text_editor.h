@@ -139,8 +139,11 @@ public:
 
 	virtual Control *get_edit_menu() override;
 	virtual void clear_edit_menu() override;
+	virtual void set_find_replace_bar(FindReplaceBar *p_bar) override;
 
 	virtual void validate() override;
+
+	virtual Control *get_base_editor() const override;
 
 	static void register_editor();
 

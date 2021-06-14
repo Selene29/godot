@@ -147,7 +147,7 @@ void OS_UWP::initialize_core() {
 	ticks_start = 0;
 	ticks_start = get_ticks_usec();
 
-	IP_Unix::make_default();
+	IPUnix::make_default();
 
 	cursor_shape = CURSOR_ARROW;
 }
@@ -400,14 +400,12 @@ void OS_UWP::ManagedType::on_gyroscope_reading_changed(Gyrometer ^ sender, Gyrom
 void OS_UWP::set_mouse_mode(MouseMode p_mode) {
 	if (p_mode == MouseMode::MOUSE_MODE_CAPTURED) {
 		CoreWindow::GetForCurrentThread()->SetPointerCapture();
-
 	} else {
 		CoreWindow::GetForCurrentThread()->ReleasePointerCapture();
 	}
 
-	if (p_mode == MouseMode::MOUSE_MODE_CAPTURED || p_mode == MouseMode::MOUSE_MODE_HIDDEN) {
+	if (p_mode == MouseMode::MOUSE_MODE_HIDDEN || p_mode == MouseMode::MOUSE_MODE_CAPTURED || p_mode == MouseMode::MOUSE_MODE_CONFINED_HIDDEN) {
 		CoreWindow::GetForCurrentThread()->PointerCursor = nullptr;
-
 	} else {
 		CoreWindow::GetForCurrentThread()->PointerCursor = ref new CoreCursor(CoreCursorType::Arrow, 0);
 	}
@@ -565,9 +563,9 @@ void OS_UWP::process_key_events() {
 
 		Ref<InputEventKey> key_event;
 		key_event.instance();
-		key_event->set_alt(kev.alt);
-		key_event->set_shift(kev.shift);
-		key_event->set_control(kev.control);
+		key_event->set_alt_pressed(kev.alt);
+		key_event->set_shift_pressed(kev.shift);
+		key_event->set_ctrl_pressed(kev.control);
 		key_event->set_echo(kev.echo);
 		key_event->set_keycode(kev.keycode);
 		key_event->set_physical_keycode(kev.physical_keycode);

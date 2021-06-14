@@ -30,8 +30,8 @@
 
 #include "platform/javascript/display_server_javascript.h"
 
-#include "drivers/dummy/rasterizer_dummy.h"
 #include "platform/javascript/os_javascript.h"
+#include "servers/rendering/rasterizer_dummy.h"
 
 #include <emscripten.h>
 #include <png.h>
@@ -120,10 +120,10 @@ void DisplayServerJavaScript::request_quit_callback() {
 
 template <typename T>
 void DisplayServerJavaScript::dom2godot_mod(T *emscripten_event_ptr, Ref<InputEventWithModifiers> godot_event) {
-	godot_event->set_shift(emscripten_event_ptr->shiftKey);
-	godot_event->set_alt(emscripten_event_ptr->altKey);
-	godot_event->set_control(emscripten_event_ptr->ctrlKey);
-	godot_event->set_metakey(emscripten_event_ptr->metaKey);
+	godot_event->set_shift_pressed(emscripten_event_ptr->shiftKey);
+	godot_event->set_alt_pressed(emscripten_event_ptr->altKey);
+	godot_event->set_ctrl_pressed(emscripten_event_ptr->ctrlKey);
+	godot_event->set_meta_pressed(emscripten_event_ptr->metaKey);
 }
 
 Ref<InputEventKey> DisplayServerJavaScript::setup_key_event(const EmscriptenKeyboardEvent *emscripten_event) {
@@ -215,14 +215,14 @@ EM_BOOL DisplayServerJavaScript::mouse_button_callback(int p_event_type, const E
 				display->last_click_ms = 0;
 				display->last_click_pos = Point2(-100, -100);
 				display->last_click_button_index = -1;
-				ev->set_doubleclick(true);
+				ev->set_double_click(true);
 			}
 
 		} else {
 			display->last_click_button_index = ev->get_button_index();
 		}
 
-		if (!ev->is_doubleclick()) {
+		if (!ev->is_double_click()) {
 			display->last_click_ms += diff;
 			display->last_click_pos = ev->get_position();
 		}
@@ -407,9 +407,10 @@ void DisplayServerJavaScript::cursor_set_custom_image(const RES &p_cursor, Curso
 
 // Mouse mode
 void DisplayServerJavaScript::mouse_set_mode(MouseMode p_mode) {
-	ERR_FAIL_COND_MSG(p_mode == MOUSE_MODE_CONFINED, "MOUSE_MODE_CONFINED is not supported for the HTML5 platform.");
-	if (p_mode == mouse_get_mode())
+	ERR_FAIL_COND_MSG(p_mode == MOUSE_MODE_CONFINED || p_mode == MOUSE_MODE_CONFINED_HIDDEN, "MOUSE_MODE_CONFINED is not supported for the HTML5 platform.");
+	if (p_mode == mouse_get_mode()) {
 		return;
+	}
 
 	if (p_mode == MOUSE_MODE_VISIBLE) {
 		godot_js_display_cursor_set_visible(1);
@@ -455,10 +456,10 @@ EM_BOOL DisplayServerJavaScript::wheel_callback(int p_event_type, const Emscript
 	ev->set_position(input->get_mouse_position());
 	ev->set_global_position(ev->get_position());
 
-	ev->set_shift(input->is_key_pressed(KEY_SHIFT));
-	ev->set_alt(input->is_key_pressed(KEY_ALT));
-	ev->set_control(input->is_key_pressed(KEY_CONTROL));
-	ev->set_metakey(input->is_key_pressed(KEY_META));
+	ev->set_shift_pressed(input->is_key_pressed(KEY_SHIFT));
+	ev->set_alt_pressed(input->is_key_pressed(KEY_ALT));
+	ev->set_ctrl_pressed(input->is_key_pressed(KEY_CTRL));
+	ev->set_meta_pressed(input->is_key_pressed(KEY_META));
 
 	if (p_event->deltaY < 0)
 		ev->set_button_index(MOUSE_BUTTON_WHEEL_UP);
@@ -536,7 +537,7 @@ bool DisplayServerJavaScript::screen_is_touchscreen(int p_screen) const {
 	return godot_js_display_touchscreen_is_available();
 }
 
-// Virtual Keybaord
+// Virtual Keyboard
 void DisplayServerJavaScript::vk_input_text_callback(const char *p_text, int p_cursor) {
 	DisplayServerJavaScript *ds = DisplayServerJavaScript::get_singleton();
 	if (!ds || ds->input_text_callback.is_null()) {
@@ -827,7 +828,6 @@ bool DisplayServerJavaScript::has_feature(Feature p_feature) const {
 		//case FEATURE_MOUSE_WARP:
 		//case FEATURE_NATIVE_DIALOG:
 		//case FEATURE_NATIVE_ICON:
-		//case FEATURE_NATIVE_VIDEO:
 		//case FEATURE_WINDOW_TRANSPARENCY:
 		//case FEATURE_KEEP_SCREEN_ON:
 		//case FEATURE_ORIENTATION:

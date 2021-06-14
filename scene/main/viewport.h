@@ -130,9 +130,9 @@ public:
 		DEBUG_DRAW_OVERDRAW,
 		DEBUG_DRAW_WIREFRAME,
 		DEBUG_DRAW_NORMAL_BUFFER,
-		DEBUG_DRAW_GI_PROBE_ALBEDO,
-		DEBUG_DRAW_GI_PROBE_LIGHTING,
-		DEBUG_DRAW_GI_PROBE_EMISSION,
+		DEBUG_DRAW_VOXEL_GI_ALBEDO,
+		DEBUG_DRAW_VOXEL_GI_LIGHTING,
+		DEBUG_DRAW_VOXEL_GI_EMISSION,
 		DEBUG_DRAW_SHADOW_ATLAS,
 		DEBUG_DRAW_DIRECTIONAL_SHADOW_ATLAS,
 		DEBUG_DRAW_SCENE_LUMINANCE,
@@ -193,7 +193,7 @@ private:
 	Set<Listener3D *> listeners;
 
 	struct CameraOverrideData {
-		Transform transform;
+		Transform3D transform;
 		enum Projection {
 			PROJECTION_PERSPECTIVE,
 			PROJECTION_ORTHOGONAL
@@ -231,9 +231,10 @@ private:
 	Transform2D global_canvas_transform;
 	Transform2D stretch_transform;
 
-	Size2i size;
+	Size2i size = Size2i(512, 512);
 	Size2i size_2d_override;
 	bool size_allocated = false;
+	bool use_xr = false;
 
 	RID contact_2d_debug;
 	RID contact_3d_debug_multimesh;
@@ -253,8 +254,8 @@ private:
 	List<Ref<InputEvent>> physics_picking_events;
 	ObjectID physics_object_capture;
 	ObjectID physics_object_over;
-	Transform physics_last_object_transform;
-	Transform physics_last_camera_transform;
+	Transform3D physics_last_object_transform;
+	Transform3D physics_last_camera_transform;
 	ObjectID physics_last_id;
 	bool physics_has_last_mousepos = false;
 	Vector2 physics_last_mousepos = Vector2(Math_INF, Math_INF);
@@ -492,8 +493,8 @@ public:
 	void enable_camera_override(bool p_enable);
 	bool is_camera_override_enabled() const;
 
-	void set_camera_override_transform(const Transform &p_transform);
-	Transform get_camera_override_transform() const;
+	void set_camera_override_transform(const Transform3D &p_transform);
+	Transform3D get_camera_override_transform() const;
 
 	void set_camera_override_perspective(float p_fovy_degrees, float p_z_near, float p_z_far);
 	void set_camera_override_orthogonal(float p_size, float p_z_near, float p_z_far);
@@ -533,6 +534,9 @@ public:
 
 	void set_transparent_background(bool p_enable);
 	bool has_transparent_background() const;
+
+	void set_use_xr(bool p_use_xr);
+	bool is_using_xr();
 
 	Ref<ViewportTexture> get_texture() const;
 
@@ -656,7 +660,6 @@ public:
 private:
 	UpdateMode update_mode = UPDATE_WHEN_VISIBLE;
 	ClearMode clear_mode = CLEAR_MODE_ALWAYS;
-	bool xr = false;
 	bool size_2d_override_stretch = false;
 
 protected:
@@ -671,9 +674,6 @@ public:
 
 	void set_size_2d_override(const Size2i &p_size);
 	Size2i get_size_2d_override() const;
-
-	void set_use_xr(bool p_use_xr);
-	bool is_using_xr();
 
 	void set_size_2d_override_stretch(bool p_enable);
 	bool is_size_2d_override_stretch_enabled() const;

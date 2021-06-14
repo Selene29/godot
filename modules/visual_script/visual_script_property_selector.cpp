@@ -59,7 +59,7 @@ void VisualScriptPropertySelector::_sbox_input(const Ref<InputEvent> &p_ie) {
 				search_box->accept_event();
 
 				TreeItem *root = search_options->get_root();
-				if (!root->get_children()) {
+				if (!root->get_first_child()) {
 					break;
 				}
 
@@ -108,7 +108,7 @@ void VisualScriptPropertySelector::_update_search() {
 			vbc->get_theme_icon("Vector3", "EditorIcons"),
 			vbc->get_theme_icon("Transform2D", "EditorIcons"),
 			vbc->get_theme_icon("Plane", "EditorIcons"),
-			vbc->get_theme_icon("Quat", "EditorIcons"),
+			vbc->get_theme_icon("Quaternion", "EditorIcons"),
 			vbc->get_theme_icon("AABB", "EditorIcons"),
 			vbc->get_theme_icon("Basis", "EditorIcons"),
 			vbc->get_theme_icon("Transform", "EditorIcons"),
@@ -265,7 +265,7 @@ void VisualScriptPropertySelector::_update_search() {
 			item->set_metadata(2, connecting);
 		}
 
-		if (category && category->get_children() == nullptr) {
+		if (category && category->get_first_child() == nullptr) {
 			memdelete(category); //old category was unused
 		}
 	}
@@ -310,7 +310,7 @@ void VisualScriptPropertySelector::_update_search() {
 		found = true;
 	}
 
-	get_ok_button()->set_disabled(root->get_children() == nullptr);
+	get_ok_button()->set_disabled(root->get_first_child() == nullptr);
 }
 
 void VisualScriptPropertySelector::create_visualscript_item(const String &name, TreeItem *const root, const String &search_input, const String &text) {

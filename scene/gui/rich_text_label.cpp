@@ -1432,10 +1432,11 @@ void RichTextLabel::_notification(int p_what) {
 			}
 		} break;
 		case NOTIFICATION_INTERNAL_PROCESS: {
-			float dt = get_process_delta_time();
-
-			_update_fx(main, dt);
-			update();
+			if (is_visible_in_tree()) {
+				float dt = get_process_delta_time();
+				_update_fx(main, dt);
+				update();
+			}
 		}
 	}
 }
@@ -1482,7 +1483,7 @@ void RichTextLabel::_gui_input(Ref<InputEvent> p_event) {
 		}
 
 		if (b->get_button_index() == MOUSE_BUTTON_LEFT) {
-			if (b->is_pressed() && !b->is_doubleclick()) {
+			if (b->is_pressed() && !b->is_double_click()) {
 				scroll_updated = false;
 				ItemFrame *c_frame = nullptr;
 				int c_line = 0;
@@ -1514,8 +1515,8 @@ void RichTextLabel::_gui_input(Ref<InputEvent> p_event) {
 						}
 					}
 				}
-			} else if (b->is_pressed() && b->is_doubleclick() && selection.enabled) {
-				//doubleclick: select word
+			} else if (b->is_pressed() && b->is_double_click() && selection.enabled) {
+				//double_click: select word
 
 				ItemFrame *c_frame = nullptr;
 				int c_line = 0;
@@ -1549,7 +1550,7 @@ void RichTextLabel::_gui_input(Ref<InputEvent> p_event) {
 			} else if (!b->is_pressed()) {
 				selection.click_item = nullptr;
 
-				if (!b->is_doubleclick() && !scroll_updated) {
+				if (!b->is_double_click() && !scroll_updated) {
 					Item *c_item = nullptr;
 
 					bool outside = true;
@@ -2231,18 +2232,22 @@ void RichTextLabel::_remove_item(Item *p_item, const int p_line, const int p_sub
 	int size = p_item->subitems.size();
 	if (size == 0) {
 		p_item->parent->subitems.erase(p_item);
+		// If a newline was erased, all lines AFTER the newline need to be decremented.
 		if (p_item->type == ITEM_NEWLINE) {
 			current_frame->lines.remove(p_line);
-			for (int i = p_subitem_line; i < current->subitems.size(); i++) {
-				if (current->subitems[i]->line > 0) {
+			for (int i = 0; i < current->subitems.size(); i++) {
+				if (current->subitems[i]->line > p_subitem_line) {
 					current->subitems[i]->line--;
 				}
 			}
 		}
 	} else {
+		// First, remove all child items for the provided item.
 		for (int i = 0; i < size; i++) {
 			_remove_item(p_item->subitems.front()->get(), p_line, p_subitem_line);
 		}
+		// Then remove the provided item itself.
+		p_item->parent->subitems.erase(p_item);
 	}
 }
 
@@ -2302,21 +2307,23 @@ bool RichTextLabel::remove_line(const int p_line) {
 		return false;
 	}
 
-	int i = 0;
-	while (i < current->subitems.size() && current->subitems[i]->line < p_line) {
-		i++;
-	}
-
-	bool was_newline = false;
-	while (i < current->subitems.size()) {
-		was_newline = current->subitems[i]->type == ITEM_NEWLINE;
-		_remove_item(current->subitems[i], current->subitems[i]->line, p_line);
-		if (was_newline) {
-			break;
+	// Remove all subitems with the same line as that provided.
+	Vector<int> subitem_indices_to_remove;
+	for (int i = 0; i < current->subitems.size(); i++) {
+		if (current->subitems[i]->line == p_line) {
+			subitem_indices_to_remove.push_back(i);
 		}
 	}
 
-	if (!was_newline) {
+	bool had_newline = false;
+	// Reverse for loop to remove items from the end first.
+	for (int i = subitem_indices_to_remove.size() - 1; i >= 0; i--) {
+		int subitem_idx = subitem_indices_to_remove[i];
+		had_newline = had_newline || current->subitems[subitem_idx]->type == ITEM_NEWLINE;
+		_remove_item(current->subitems[subitem_idx], current->subitems[subitem_idx]->line, p_line);
+	}
+
+	if (!had_newline) {
 		current_frame->lines.remove(p_line);
 		if (current_frame->lines.size() == 0) {
 			current_frame->lines.resize(1);
@@ -2328,6 +2335,7 @@ bool RichTextLabel::remove_line(const int p_line) {
 	}
 
 	main->first_invalid_line = 0; // p_line ???
+	update();
 
 	return true;
 }
@@ -3926,7 +3934,7 @@ void RichTextLabel::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "custom_effects", PROPERTY_HINT_ARRAY_TYPE, "RichTextEffect", (PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_SCRIPT_VARIABLE)), "set_effects", "get_effects");
 
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "text_direction", PROPERTY_HINT_ENUM, "Auto,LTR,RTL,Inherited"), "set_text_direction", "get_text_direction");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "text_direction", PROPERTY_HINT_ENUM, "Auto,Left-to-Right,Right-to-Left,Inherited"), "set_text_direction", "get_text_direction");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "language"), "set_language", "get_language");
 
 	ADD_GROUP("Structured Text", "structured_text_");

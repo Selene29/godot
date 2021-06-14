@@ -652,6 +652,31 @@
 				Converts a 2D point expressed in the polar coordinate system (a distance from the origin [code]r[/code] and an angle [code]th[/code]) to the cartesian coordinate system (X and Y axis).
 			</description>
 		</method>
+		<method name="posmod">
+			<return type="int">
+			</return>
+			<argument index="0" name="x" type="int">
+			</argument>
+			<argument index="1" name="y" type="int">
+			</argument>
+			<description>
+				Returns the integer modulus of [code]x/y[/code] that wraps equally in positive and negative.
+				[codeblock]
+				for i in range(-3, 4):
+				    print("%2d %2d %2d" % [i, i % 3, posmod(i, 3)])
+				[/codeblock]
+				Produces:
+				[codeblock]
+				-3  0  0
+				-2 -2  1
+				-1 -1  2
+				0  0  0
+				1  1  1
+				2  2  2
+				3  0  0
+				[/codeblock]
+			</description>
+		</method>
 		<method name="pow">
 			<return type="float">
 			</return>
@@ -1236,6 +1261,9 @@
 		<member name="TextServerManager" type="TextServerManager" setter="" getter="">
 			The [TextServerManager] singleton.
 		</member>
+		<member name="Time" type="Time" setter="" getter="">
+			The [Time] singleton.
+		</member>
 		<member name="TranslationServer" type="TranslationServer" setter="" getter="">
 			The [TranslationServer] singleton.
 		</member>
@@ -1368,7 +1396,7 @@
 		<constant name="KEY_SHIFT" value="16777237" enum="Key">
 			Shift key.
 		</constant>
-		<constant name="KEY_CONTROL" value="16777238" enum="Key">
+		<constant name="KEY_CTRL" value="16777238" enum="Key">
 			Control key.
 		</constant>
 		<constant name="KEY_META" value="16777239" enum="Key">
@@ -2571,8 +2599,8 @@
 		<constant name="TYPE_PLANE" value="12" enum="Variant.Type">
 			Variable is of type [Plane].
 		</constant>
-		<constant name="TYPE_QUAT" value="13" enum="Variant.Type">
-			Variable is of type [Quat].
+		<constant name="TYPE_QUATERNION" value="13" enum="Variant.Type">
+			Variable is of type [Quaternion].
 		</constant>
 		<constant name="TYPE_AABB" value="14" enum="Variant.Type">
 			Variable is of type [AABB].
@@ -2580,8 +2608,8 @@
 		<constant name="TYPE_BASIS" value="15" enum="Variant.Type">
 			Variable is of type [Basis].
 		</constant>
-		<constant name="TYPE_TRANSFORM" value="16" enum="Variant.Type">
-			Variable is of type [Transform].
+		<constant name="TYPE_TRANSFORM3D" value="16" enum="Variant.Type">
+			Variable is of type [Transform3D].
 		</constant>
 		<constant name="TYPE_COLOR" value="17" enum="Variant.Type">
 			Variable is of type [Color].

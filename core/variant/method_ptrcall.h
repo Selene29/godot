@@ -122,10 +122,10 @@ MAKE_PTRARG_BY_REFERENCE(Vector3);
 MAKE_PTRARG_BY_REFERENCE(Vector3i);
 MAKE_PTRARG(Transform2D);
 MAKE_PTRARG_BY_REFERENCE(Plane);
-MAKE_PTRARG(Quat);
+MAKE_PTRARG(Quaternion);
 MAKE_PTRARG_BY_REFERENCE(AABB);
 MAKE_PTRARG_BY_REFERENCE(Basis);
-MAKE_PTRARG_BY_REFERENCE(Transform);
+MAKE_PTRARG_BY_REFERENCE(Transform3D);
 MAKE_PTRARG_BY_REFERENCE(Color);
 MAKE_PTRARG(StringName);
 MAKE_PTRARG(NodePath);
@@ -364,7 +364,7 @@ MAKE_VECARR(Plane);
 		}                                                                      \
 	}
 
-// Special case for IP_Address.
+// Special case for IPAddress.
 
 #define MAKE_STRINGCONV_BY_REFERENCE(m_type)                                  \
 	template <>                                                               \
@@ -387,7 +387,7 @@ MAKE_VECARR(Plane);
 		}                                                                     \
 	}
 
-MAKE_STRINGCONV_BY_REFERENCE(IP_Address);
+MAKE_STRINGCONV_BY_REFERENCE(IPAddress);
 
 template <>
 struct PtrToArg<Vector<Face3>> {

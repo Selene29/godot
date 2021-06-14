@@ -36,6 +36,7 @@
 #include "core/debugger/engine_debugger.h"
 #include "core/input/input.h"
 #include "core/input/input_map.h"
+#include "core/io/dir_access.h"
 #include "core/io/file_access_network.h"
 #include "core/io/file_access_pack.h"
 #include "core/io/file_access_zip.h"
@@ -43,8 +44,8 @@
 #include "core/io/ip.h"
 #include "core/io/resource_loader.h"
 #include "core/object/message_queue.h"
-#include "core/os/dir_access.h"
 #include "core/os/os.h"
+#include "core/os/time.h"
 #include "core/register_core_types.h"
 #include "core/string/translation.h"
 #include "core/version.h"
@@ -101,6 +102,7 @@ static InputMap *input_map = nullptr;
 static TranslationServer *translation_server = nullptr;
 static Performance *performance = nullptr;
 static PackedData *packed_data = nullptr;
+static Time *time_singleton = nullptr;
 #ifdef MINIZIP_ENABLED
 static ZipArchive *zip_packed_data = nullptr;
 #endif
@@ -532,6 +534,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	MAIN_PRINT("Main: Initialize Globals");
 
 	input_map = memnew(InputMap);
+	time_singleton = memnew(Time);
 	globals = memnew(ProjectSettings);
 
 	register_core_settings(); //here globals are present
@@ -1327,23 +1330,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	}
 
 	{
-		String orientation = GLOBAL_DEF("display/window/handheld/orientation", "landscape");
-
-		if (orientation == "portrait") {
-			window_orientation = DisplayServer::SCREEN_PORTRAIT;
-		} else if (orientation == "reverse_landscape") {
-			window_orientation = DisplayServer::SCREEN_REVERSE_LANDSCAPE;
-		} else if (orientation == "reverse_portrait") {
-			window_orientation = DisplayServer::SCREEN_REVERSE_PORTRAIT;
-		} else if (orientation == "sensor_landscape") {
-			window_orientation = DisplayServer::SCREEN_SENSOR_LANDSCAPE;
-		} else if (orientation == "sensor_portrait") {
-			window_orientation = DisplayServer::SCREEN_SENSOR_PORTRAIT;
-		} else if (orientation == "sensor") {
-			window_orientation = DisplayServer::SCREEN_SENSOR;
-		} else {
-			window_orientation = DisplayServer::SCREEN_LANDSCAPE;
-		}
+		window_orientation = DisplayServer::ScreenOrientation(int(GLOBAL_DEF_BASIC("display/window/handheld/orientation", DisplayServer::ScreenOrientation::SCREEN_LANDSCAPE)));
 	}
 
 	Engine::get_singleton()->set_iterations_per_second(GLOBAL_DEF_BASIC("physics/common/physics_fps", 60));
@@ -1418,6 +1405,9 @@ error:
 	if (input_map) {
 		memdelete(input_map);
 	}
+	if (time_singleton) {
+		memdelete(time_singleton);
+	}
 	if (translation_server) {
 		memdelete(translation_server);
 	}
@@ -1458,6 +1448,12 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 #if !defined(NO_THREADS)
 	if (p_main_tid_override) {
 		Thread::main_thread_id = p_main_tid_override;
+	}
+#endif
+
+#ifdef TOOLS_ENABLED
+	if (editor || project_manager) {
+		EditorNode::register_editor_paths(project_manager);
 	}
 #endif
 
@@ -2252,7 +2248,7 @@ bool Main::start() {
 			ProjectSettings::get_singleton()->set_custom_property_info(
 					"rendering/textures/canvas_textures/default_texture_filter",
 					PropertyInfo(Variant::INT, "rendering/textures/canvas_textures/default_texture_filter", PROPERTY_HINT_ENUM,
-							"Nearest,Linear,MipmapLinear,MipmapNearest"));
+							"Nearest,Linear,Linear Mipmap,Nearest Mipmap"));
 			GLOBAL_DEF_BASIC("rendering/textures/canvas_textures/default_texture_repeat", 0);
 			ProjectSettings::get_singleton()->set_custom_property_info(
 					"rendering/textures/canvas_textures/default_texture_repeat",
@@ -2676,6 +2672,9 @@ void Main::cleanup(bool p_force) {
 	}
 	if (input_map) {
 		memdelete(input_map);
+	}
+	if (time_singleton) {
+		memdelete(time_singleton);
 	}
 	if (translation_server) {
 		memdelete(translation_server);

@@ -567,15 +567,14 @@ void EditorPropertyArray::setup(Variant::Type p_array_type, const String &p_hint
 }
 
 void EditorPropertyArray::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("can_drop_data_fw"), &EditorPropertyArray::can_drop_data_fw);
-	ClassDB::bind_method(D_METHOD("drop_data_fw"), &EditorPropertyArray::drop_data_fw);
+	ClassDB::bind_method(D_METHOD("_can_drop_data_fw"), &EditorPropertyArray::can_drop_data_fw);
+	ClassDB::bind_method(D_METHOD("_drop_data_fw"), &EditorPropertyArray::drop_data_fw);
 }
 
 EditorPropertyArray::EditorPropertyArray() {
 	object.instance();
 	page_len = int(EDITOR_GET("interface/inspector/max_array_dictionary_items_per_page"));
 	edit = memnew(Button);
-	edit->set_flat(true);
 	edit->set_h_size_flags(SIZE_EXPAND_FILL);
 	edit->set_clip_text(true);
 	edit->connect("pressed", callable_mp(this, &EditorPropertyArray::_edit_pressed));
@@ -851,8 +850,8 @@ void EditorPropertyDictionary::update_property() {
 					prop = editor;
 
 				} break;
-				case Variant::QUAT: {
-					EditorPropertyQuat *editor = memnew(EditorPropertyQuat);
+				case Variant::QUATERNION: {
+					EditorPropertyQuaternion *editor = memnew(EditorPropertyQuaternion);
 					editor->setup(-100000, 100000, 0.001, true);
 					prop = editor;
 
@@ -869,8 +868,8 @@ void EditorPropertyDictionary::update_property() {
 					prop = editor;
 
 				} break;
-				case Variant::TRANSFORM: {
-					EditorPropertyTransform *editor = memnew(EditorPropertyTransform);
+				case Variant::TRANSFORM3D: {
+					EditorPropertyTransform3D *editor = memnew(EditorPropertyTransform3D);
 					editor->setup(-100000, 100000, 0.001, true);
 					prop = editor;
 
@@ -903,7 +902,7 @@ void EditorPropertyDictionary::update_property() {
 
 					} else {
 						EditorPropertyResource *editor = memnew(EditorPropertyResource);
-						editor->setup("Resource");
+						editor->setup(object.ptr(), prop_name, "Resource");
 						prop = editor;
 					}
 
@@ -1070,7 +1069,6 @@ EditorPropertyDictionary::EditorPropertyDictionary() {
 	object.instance();
 	page_len = int(EDITOR_GET("interface/inspector/max_array_dictionary_items_per_page"));
 	edit = memnew(Button);
-	edit->set_flat(true);
 	edit->set_h_size_flags(SIZE_EXPAND_FILL);
 	edit->set_clip_text(true);
 	edit->connect("pressed", callable_mp(this, &EditorPropertyDictionary::_edit_pressed));

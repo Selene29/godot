@@ -170,21 +170,21 @@ class InputEventWithModifiers : public InputEventFromWindow {
 
 	bool store_command = true;
 
-	bool shift = false;
-	bool alt = false;
+	bool shift_pressed = false;
+	bool alt_pressed = false;
 #ifdef APPLE_STYLE_KEYS
 	union {
-		bool command;
-		bool meta = false; //< windows/mac key
+		bool command_pressed;
+		bool meta_pressed = false; //< windows/mac key
 	};
 
-	bool control = false;
+	bool ctrl_pressed = false;
 #else
 	union {
-		bool command; //< windows/mac key
-		bool control = false;
+		bool command_pressed; //< windows/mac key
+		bool ctrl_pressed = false;
 	};
-	bool meta = false; //< windows/mac key
+	bool meta_pressed = false; //< windows/mac key
 #endif
 
 protected:
@@ -195,20 +195,20 @@ public:
 	void set_store_command(bool p_enabled);
 	bool is_storing_command() const;
 
-	void set_shift(bool p_enabled);
-	bool get_shift() const;
+	void set_shift_pressed(bool p_pressed);
+	bool is_shift_pressed() const;
 
-	void set_alt(bool p_enabled);
-	bool get_alt() const;
+	void set_alt_pressed(bool p_pressed);
+	bool is_alt_pressed() const;
 
-	void set_control(bool p_enabled);
-	bool get_control() const;
+	void set_ctrl_pressed(bool p_pressed);
+	bool is_ctrl_pressed() const;
 
-	void set_metakey(bool p_enabled);
-	bool get_metakey() const;
+	void set_meta_pressed(bool p_pressed);
+	bool is_meta_pressed() const;
 
-	void set_command(bool p_enabled);
-	bool get_command() const;
+	void set_command_pressed(bool p_pressed);
+	bool is_command_pressed() const;
 
 	void set_modifiers_from_event(const InputEventWithModifiers *event);
 
@@ -294,7 +294,7 @@ class InputEventMouseButton : public InputEventMouse {
 	float factor = 1;
 	int button_index = 0;
 	bool pressed = false; //otherwise released
-	bool doubleclick = false; //last even less than doubleclick time
+	bool double_click = false; //last even less than double click time
 
 protected:
 	static void _bind_methods();
@@ -309,8 +309,8 @@ public:
 	void set_pressed(bool p_pressed);
 	virtual bool is_pressed() const override;
 
-	void set_doubleclick(bool p_doubleclick);
-	bool is_doubleclick() const;
+	void set_double_click(bool p_double_click);
+	bool is_double_click() const;
 
 	virtual Ref<InputEvent> xformed_by(const Transform2D &p_xform, const Vector2 &p_local_ofs = Vector2()) const override;
 	virtual bool action_match(const Ref<InputEvent> &p_event, bool *p_pressed, float *p_strength, float *p_raw_strength, float p_deadzone) const override;

@@ -98,17 +98,14 @@ void BaseButton::_notification(int p_what) {
 	}
 
 	if (p_what == NOTIFICATION_FOCUS_ENTER) {
-		status.hovering = true;
 		update();
 	}
 
 	if (p_what == NOTIFICATION_FOCUS_EXIT) {
 		if (status.press_attempt) {
 			status.press_attempt = false;
-			status.hovering = false;
 			update();
 		} else if (status.hovering) {
-			status.hovering = false;
 			update();
 		}
 	}
@@ -155,6 +152,9 @@ void BaseButton::on_action_event(Ref<InputEvent> p_event) {
 				}
 				status.pressed = !status.pressed;
 				_unpress_group();
+				if (button_group.is_valid()) {
+					button_group->emit_signal("pressed", this);
+				}
 				_toggled(status.pressed);
 				_pressed();
 			}
@@ -172,10 +172,9 @@ void BaseButton::on_action_event(Ref<InputEvent> p_event) {
 				status.hovering = false;
 			}
 		}
-		// pressed state should be correct with button_up signal
-		emit_signal("button_up");
 		status.press_attempt = false;
 		status.pressing_inside = false;
+		emit_signal("button_up");
 	}
 
 	update();
@@ -218,6 +217,9 @@ void BaseButton::set_pressed(bool p_pressed) {
 
 	if (p_pressed) {
 		_unpress_group();
+		if (button_group.is_valid()) {
+			button_group->emit_signal("pressed", this);
+		}
 	}
 	_toggled(status.pressed);
 
@@ -487,6 +489,7 @@ BaseButton *ButtonGroup::get_pressed_button() {
 void ButtonGroup::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_pressed_button"), &ButtonGroup::get_pressed_button);
 	ClassDB::bind_method(D_METHOD("get_buttons"), &ButtonGroup::_get_buttons);
+	ADD_SIGNAL(MethodInfo("pressed", PropertyInfo(Variant::OBJECT, "button")));
 }
 
 ButtonGroup::ButtonGroup() {

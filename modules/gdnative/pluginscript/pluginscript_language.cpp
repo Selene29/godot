@@ -30,7 +30,7 @@
 
 // Godot imports
 #include "core/config/project_settings.h"
-#include "core/os/file_access.h"
+#include "core/io/file_access.h"
 #include "core/os/os.h"
 // PluginScript imports
 #include "pluginscript_language.h"
@@ -75,6 +75,10 @@ void PluginScriptLanguage::get_reserved_words(List<String> *p_words) const {
 			w++;
 		}
 	}
+}
+
+bool PluginScriptLanguage::is_control_flow_keyword(String p_keyword) const {
+	return false;
 }
 
 void PluginScriptLanguage::get_comment_delimiters(List<String> *p_delimiters) const {

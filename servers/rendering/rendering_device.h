@@ -93,18 +93,24 @@ public:
 		DeviceFamily device_family = DEVICE_UNKNOWN;
 		uint32_t version_major = 1.0;
 		uint32_t version_minor = 0.0;
+
 		// subgroup capabilities
 		uint32_t subgroup_size = 0;
 		uint32_t subgroup_in_shaders = 0; // Set flags using SHADER_STAGE_VERTEX_BIT, SHADER_STAGE_FRAGMENT_BIT, etc.
 		uint32_t subgroup_operations = 0; // Set flags, using SubgroupOperations
+
+		// features
+		bool supports_multiview = false; // If true this device supports multiview options
 	};
 
+	typedef String (*ShaderGetCacheKeyFunction)(const Capabilities *p_capabilities);
 	typedef Vector<uint8_t> (*ShaderCompileFunction)(ShaderStage p_stage, const String &p_source_code, ShaderLanguage p_language, String *r_error, const Capabilities *p_capabilities);
 	typedef Vector<uint8_t> (*ShaderCacheFunction)(ShaderStage p_stage, const String &p_source_code, ShaderLanguage p_language);
 
 private:
 	static ShaderCompileFunction compile_function;
 	static ShaderCacheFunction cache_function;
+	static ShaderGetCacheKeyFunction get_cache_key_function;
 
 	static RenderingDevice *singleton;
 
@@ -510,11 +516,11 @@ public:
 	typedef int64_t FramebufferFormatID;
 
 	// This ID is warranted to be unique for the same formats, does not need to be freed
-	virtual FramebufferFormatID framebuffer_format_create(const Vector<AttachmentFormat> &p_format) = 0;
+	virtual FramebufferFormatID framebuffer_format_create(const Vector<AttachmentFormat> &p_format, uint32_t p_view_count = 1) = 0;
 	virtual FramebufferFormatID framebuffer_format_create_empty(TextureSamples p_samples = TEXTURE_SAMPLES_1) = 0;
 	virtual TextureSamples framebuffer_format_get_texture_samples(FramebufferFormatID p_format) = 0;
 
-	virtual RID framebuffer_create(const Vector<RID> &p_texture_attachments, FramebufferFormatID p_format_check = INVALID_ID) = 0;
+	virtual RID framebuffer_create(const Vector<RID> &p_texture_attachments, FramebufferFormatID p_format_check = INVALID_ID, uint32_t p_view_count = 1) = 0;
 	virtual RID framebuffer_create_empty(const Size2i &p_size, TextureSamples p_samples = TEXTURE_SAMPLES_1, FramebufferFormatID p_format_check = INVALID_ID) = 0;
 
 	virtual FramebufferFormatID framebuffer_get_format(RID p_framebuffer) = 0;
@@ -631,9 +637,11 @@ public:
 	const Capabilities *get_device_capabilities() const { return &device_capabilities; };
 
 	virtual Vector<uint8_t> shader_compile_from_source(ShaderStage p_stage, const String &p_source_code, ShaderLanguage p_language = SHADER_LANGUAGE_GLSL, String *r_error = nullptr, bool p_allow_cache = true);
+	virtual String shader_get_cache_key() const;
 
 	static void shader_set_compile_function(ShaderCompileFunction p_function);
 	static void shader_set_cache_function(ShaderCacheFunction p_function);
+	static void shader_set_get_cache_key_function(ShaderGetCacheKeyFunction p_function);
 
 	struct ShaderStageData {
 		ShaderStage shader_stage;
@@ -978,7 +986,7 @@ public:
 	enum InitialAction {
 		INITIAL_ACTION_CLEAR, //start rendering and clear the whole framebuffer (region or not) (supply params)
 		INITIAL_ACTION_CLEAR_REGION, //start rendering and clear the framebuffer in the specified region (supply params)
-		INITIAL_ACTION_CLEAR_REGION_CONTINUE, //countinue rendering and clear the framebuffer in the specified region (supply params)
+		INITIAL_ACTION_CLEAR_REGION_CONTINUE, //continue rendering and clear the framebuffer in the specified region (supply params)
 		INITIAL_ACTION_KEEP, //start rendering, but keep attached color texture contents (depth will be cleared)
 		INITIAL_ACTION_DROP, //start rendering, ignore what is there, just write above it
 		INITIAL_ACTION_CONTINUE, //continue rendering (framebuffer must have been left in "continue" state as final action previously)

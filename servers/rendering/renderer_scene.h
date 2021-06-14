@@ -42,7 +42,7 @@ public:
 	virtual void camera_set_perspective(RID p_camera, float p_fovy_degrees, float p_z_near, float p_z_far) = 0;
 	virtual void camera_set_orthogonal(RID p_camera, float p_size, float p_z_near, float p_z_far) = 0;
 	virtual void camera_set_frustum(RID p_camera, float p_size, Vector2 p_offset, float p_z_near, float p_z_far) = 0;
-	virtual void camera_set_transform(RID p_camera, const Transform &p_transform) = 0;
+	virtual void camera_set_transform(RID p_camera, const Transform3D &p_transform) = 0;
 	virtual void camera_set_cull_mask(RID p_camera, uint32_t p_layers) = 0;
 	virtual void camera_set_environment(RID p_camera, RID p_env) = 0;
 	virtual void camera_set_camera_effects(RID p_camera, RID p_fx) = 0;
@@ -70,7 +70,7 @@ public:
 	virtual void instance_set_base(RID p_instance, RID p_base) = 0;
 	virtual void instance_set_scenario(RID p_instance, RID p_scenario) = 0;
 	virtual void instance_set_layer_mask(RID p_instance, uint32_t p_mask) = 0;
-	virtual void instance_set_transform(RID p_instance, const Transform &p_transform) = 0;
+	virtual void instance_set_transform(RID p_instance, const Transform3D &p_transform) = 0;
 	virtual void instance_attach_object_instance_id(RID p_instance, ObjectID p_id) = 0;
 	virtual void instance_set_blend_shape_weight(RID p_instance, int p_shape, float p_weight) = 0;
 	virtual void instance_set_surface_override_material(RID p_instance, int p_surface, RID p_material) = 0;
@@ -189,20 +189,19 @@ public:
 
 	virtual RID render_buffers_create() = 0;
 
-	virtual void render_buffers_configure(RID p_render_buffers, RID p_render_target, int p_width, int p_height, RS::ViewportMSAA p_msaa, RS::ViewportScreenSpaceAA p_screen_space_aa, bool p_use_debanding) = 0;
+	virtual void render_buffers_configure(RID p_render_buffers, RID p_render_target, int p_width, int p_height, RS::ViewportMSAA p_msaa, RS::ViewportScreenSpaceAA p_screen_space_aa, bool p_use_debanding, uint32_t p_view_count) = 0;
 
 	virtual void gi_set_use_half_resolution(bool p_enable) = 0;
 
 	virtual void set_debug_draw_mode(RS::ViewportDebugDraw p_debug_draw) = 0;
 
 	virtual TypedArray<Image> bake_render_uv2(RID p_base, const Vector<RID> &p_material_overrides, const Size2i &p_image_size) = 0;
-	virtual void gi_probe_set_quality(RS::GIProbeQuality) = 0;
+	virtual void voxel_gi_set_quality(RS::VoxelGIQuality) = 0;
 
 	virtual void sdfgi_set_debug_probe_select(const Vector3 &p_position, const Vector3 &p_dir) = 0;
 
 	virtual void render_empty_scene(RID p_render_buffers, RID p_scenario, RID p_shadow_atlas) = 0;
-	virtual void render_camera(RID p_render_buffers, RID p_camera, RID p_scenario, RID p_viewport, Size2 p_viewport_size, float p_lod_threshold, RID p_shadow_atlas) = 0;
-	virtual void render_camera(RID p_render_buffers, Ref<XRInterface> &p_interface, XRInterface::Eyes p_eye, RID p_camera, RID p_scenario, RID p_viewport, Size2 p_viewport_size, float p_lod_threshold, RID p_shadow_atlas) = 0;
+	virtual void render_camera(RID p_render_buffers, RID p_camera, RID p_scenario, RID p_viewport, Size2 p_viewport_size, float p_lod_threshold, RID p_shadow_atlas, Ref<XRInterface> &p_xr_interface) = 0;
 
 	virtual void update() = 0;
 	virtual void render_probes() = 0;

@@ -30,9 +30,9 @@
 
 #include "editor_asset_installer.h"
 
+#include "core/io/dir_access.h"
+#include "core/io/file_access.h"
 #include "core/io/zip_io.h"
-#include "core/os/dir_access.h"
-#include "core/os/file_access.h"
 #include "editor_node.h"
 #include "progress_dialog.h"
 
@@ -45,8 +45,8 @@ void EditorAssetInstaller::_update_subitems(TreeItem *p_item, bool p_check, bool
 		p_item->set_checked(0, false);
 	}
 
-	if (p_item->get_children()) {
-		_update_subitems(p_item->get_children(), p_check);
+	if (p_item->get_first_child()) {
+		_update_subitems(p_item->get_first_child(), p_check);
 	}
 
 	if (!p_first && p_item->get_next()) {
@@ -60,7 +60,7 @@ void EditorAssetInstaller::_uncheck_parent(TreeItem *p_item) {
 	}
 
 	bool any_checked = false;
-	TreeItem *item = p_item->get_children();
+	TreeItem *item = p_item->get_first_child();
 	while (item) {
 		if (item->is_checked(0)) {
 			any_checked = true;
@@ -137,7 +137,7 @@ void EditorAssetInstaller::open(const String &p_path, int p_depth) {
 		extension_guess["atlastex"] = tree->get_theme_icon("AtlasTexture", "EditorIcons");
 		extension_guess["scn"] = tree->get_theme_icon("PackedScene", "EditorIcons");
 		extension_guess["tscn"] = tree->get_theme_icon("PackedScene", "EditorIcons");
-		extension_guess["shader"] = tree->get_theme_icon("Shader", "EditorIcons");
+		extension_guess["gdshader"] = tree->get_theme_icon("Shader", "EditorIcons");
 		extension_guess["gd"] = tree->get_theme_icon("GDScript", "EditorIcons");
 		extension_guess["vs"] = tree->get_theme_icon("VisualScript", "EditorIcons");
 	}

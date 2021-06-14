@@ -31,11 +31,11 @@
 #include "project_manager.h"
 
 #include "core/io/config_file.h"
+#include "core/io/dir_access.h"
+#include "core/io/file_access.h"
 #include "core/io/resource_saver.h"
 #include "core/io/stream_peer_ssl.h"
 #include "core/io/zip_io.h"
-#include "core/os/dir_access.h"
-#include "core/os/file_access.h"
 #include "core/os/keyboard.h"
 #include "core/os/os.h"
 #include "core/string/translation.h"
@@ -100,7 +100,6 @@ private:
 	FileDialog *fdialog_install;
 	String zip_path;
 	String zip_title;
-	String zip_root;
 	AcceptDialog *dialog_error;
 	String fav_dir;
 
@@ -201,9 +200,7 @@ private:
 						char fname[16384];
 						ret = unzGetCurrentFileInfo(pkg, &info, fname, 16384, nullptr, 0, nullptr, 0);
 
-						String fname_str = String(fname);
-						if (fname_str.ends_with("project.godot")) {
-							zip_root = fname_str.substr(0, fname_str.rfind("project.godot"));
+						if (String(fname).ends_with("project.godot")) {
 							break;
 						}
 
@@ -524,7 +521,24 @@ private:
 						return;
 					}
 
+					// Find the zip_root
+					String zip_root;
 					int ret = unzGoToFirstFile(pkg);
+					while (ret == UNZ_OK) {
+						unz_file_info info;
+						char fname[16384];
+						unzGetCurrentFileInfo(pkg, &info, fname, 16384, nullptr, 0, nullptr, 0);
+
+						String name = fname;
+						if (name.ends_with("project.godot")) {
+							zip_root = name.substr(0, name.rfind("project.godot"));
+							break;
+						}
+
+						ret = unzGoToNextFile(pkg);
+					}
+
+					ret = unzGoToFirstFile(pkg);
 
 					Vector<String> failed_files;
 
@@ -1470,16 +1484,7 @@ Vector<ProjectList::Item> ProjectList::get_selected_projects() const {
 
 void ProjectList::ensure_project_visible(int p_index) {
 	const Item &item = _projects[p_index];
-
-	int item_top = item.control->get_position().y;
-	int item_bottom = item.control->get_position().y + item.control->get_size().y;
-
-	if (item_top < get_v_scroll()) {
-		set_v_scroll(item_top);
-
-	} else if (item_bottom > get_v_scroll() + get_size().y) {
-		set_v_scroll(item_bottom - get_size().y);
-	}
+	ensure_control_visible(item.control);
 }
 
 int ProjectList::get_single_selected_index() const {
@@ -1740,7 +1745,7 @@ void ProjectList::_panel_input(const Ref<InputEvent> &p_ev, Node *p_hb) {
 	const Item &clicked_project = _projects[clicked_index];
 
 	if (mb.is_valid() && mb->is_pressed() && mb->get_button_index() == MOUSE_BUTTON_LEFT) {
-		if (mb->get_shift() && _selected_project_keys.size() > 0 && _last_clicked != "" && clicked_project.project_key != _last_clicked) {
+		if (mb->is_shift_pressed() && _selected_project_keys.size() > 0 && _last_clicked != "" && clicked_project.project_key != _last_clicked) {
 			int anchor_index = -1;
 			for (int i = 0; i < _projects.size(); ++i) {
 				const Item &p = _projects[i];
@@ -1752,7 +1757,7 @@ void ProjectList::_panel_input(const Ref<InputEvent> &p_ev, Node *p_hb) {
 			CRASH_COND(anchor_index == -1);
 			select_range(anchor_index, clicked_index);
 
-		} else if (mb->get_control()) {
+		} else if (mb->is_ctrl_pressed()) {
 			toggle_select(clicked_index);
 
 		} else {
@@ -1762,7 +1767,7 @@ void ProjectList::_panel_input(const Ref<InputEvent> &p_ev, Node *p_hb) {
 
 		emit_signal(SIGNAL_SELECTION_CHANGED);
 
-		if (!mb->get_control() && mb->is_doubleclick()) {
+		if (!mb->is_ctrl_pressed() && mb->is_double_click()) {
 			emit_signal(SIGNAL_PROJECT_ASK_OPEN);
 		}
 	}
@@ -1937,7 +1942,7 @@ void ProjectManager::_unhandled_key_input(const Ref<InputEvent> &p_ev) {
 
 			} break;
 			case KEY_UP: {
-				if (k->get_shift()) {
+				if (k->is_shift_pressed()) {
 					break;
 				}
 
@@ -1951,7 +1956,7 @@ void ProjectManager::_unhandled_key_input(const Ref<InputEvent> &p_ev) {
 				break;
 			}
 			case KEY_DOWN: {
-				if (k->get_shift()) {
+				if (k->is_shift_pressed()) {
 					break;
 				}
 
@@ -1964,7 +1969,7 @@ void ProjectManager::_unhandled_key_input(const Ref<InputEvent> &p_ev) {
 
 			} break;
 			case KEY_F: {
-				if (k->get_command()) {
+				if (k->is_command_pressed()) {
 					this->search_box->grab_focus();
 				} else {
 					keycode_handled = false;
@@ -2124,8 +2129,8 @@ void ProjectManager::_run_project_confirm() {
 		const String &selected = selected_list[i].project_key;
 		String path = EditorSettings::get_singleton()->get("projects/" + selected);
 
-		// `.right(6)` on `IMPORTED_FILES_PATH` strips away the leading "res://".
-		if (!DirAccess::exists(path.plus_file(ProjectSettings::IMPORTED_FILES_PATH.right(6)))) {
+		// `.substr(6)` on `IMPORTED_FILES_PATH` strips away the leading "res://".
+		if (!DirAccess::exists(path.plus_file(ProjectSettings::IMPORTED_FILES_PATH.substr(6)))) {
 			run_error_diag->set_text(TTR("Can't run project: Assets need to be imported.\nPlease edit the project to trigger the initial import."));
 			run_error_diag->popup_centered();
 			continue;
@@ -2371,11 +2376,16 @@ void ProjectManager::_on_search_term_changed(const String &p_term) {
 void ProjectManager::_bind_methods() {
 	ClassDB::bind_method("_unhandled_key_input", &ProjectManager::_unhandled_key_input);
 	ClassDB::bind_method("_update_project_buttons", &ProjectManager::_update_project_buttons);
+	ClassDB::bind_method("_version_button_pressed", &ProjectManager::_version_button_pressed);
 }
 
 void ProjectManager::_open_asset_library() {
 	asset_library->disable_community_support();
 	tabs->set_current_tab(1);
+}
+
+void ProjectManager::_version_button_pressed() {
+	DisplayServer::get_singleton()->clipboard_set(version_btn->get_text());
 }
 
 ProjectManager::ProjectManager() {
@@ -2480,7 +2490,7 @@ ProjectManager::ProjectManager() {
 	tabs->connect("tab_changed", callable_mp(this, &ProjectManager::_on_tab_changed));
 
 	HBoxContainer *projects_hb = memnew(HBoxContainer);
-	projects_hb->set_name(TTR("Projects"));
+	projects_hb->set_name(TTR("Local Projects"));
 	tabs->add_child(projects_hb);
 
 	{
@@ -2601,15 +2611,30 @@ ProjectManager::ProjectManager() {
 		settings_hb->set_h_grow_direction(Control::GROW_DIRECTION_BEGIN);
 		settings_hb->set_anchors_and_offsets_preset(Control::PRESET_TOP_RIGHT);
 
-		Label *version_label = memnew(Label);
+		// A VBoxContainer that contains a dummy Control node to adjust the LinkButton's vertical position.
+		VBoxContainer *spacer_vb = memnew(VBoxContainer);
+		settings_hb->add_child(spacer_vb);
+
+		Control *v_spacer = memnew(Control);
+		spacer_vb->add_child(v_spacer);
+
+		version_btn = memnew(LinkButton);
 		String hash = String(VERSION_HASH);
 		if (hash.length() != 0) {
-			hash = "." + hash.left(9);
+			hash = " " + vformat("[%s]", hash.left(9));
 		}
-		version_label->set_text("v" VERSION_FULL_BUILD "" + hash);
-		version_label->set_self_modulate(Color(1, 1, 1, 0.6));
-		version_label->set_align(Label::ALIGN_CENTER);
-		settings_hb->add_child(version_label);
+		version_btn->set_text("v" VERSION_FULL_BUILD + hash);
+		// Fade the version label to be less prominent, but still readable.
+		version_btn->set_self_modulate(Color(1, 1, 1, 0.6));
+		version_btn->set_underline_mode(LinkButton::UNDERLINE_MODE_ON_HOVER);
+		version_btn->set_tooltip(TTR("Click to copy."));
+		version_btn->connect("pressed", callable_mp(this, &ProjectManager::_version_button_pressed));
+		spacer_vb->add_child(version_btn);
+
+		// Add a small horizontal spacer between the version and language buttons
+		// to distinguish them.
+		Control *h_spacer = memnew(Control);
+		settings_hb->add_child(h_spacer);
 
 		language_btn = memnew(OptionButton);
 		language_btn->set_flat(true);
@@ -2647,7 +2672,7 @@ ProjectManager::ProjectManager() {
 
 	if (StreamPeerSSL::is_available()) {
 		asset_library = memnew(EditorAssetLibrary(true));
-		asset_library->set_name(TTR("Templates"));
+		asset_library->set_name(TTR("Asset Library Projects"));
 		tabs->add_child(asset_library);
 		asset_library->connect("install_asset", callable_mp(this, &ProjectManager::_install_project));
 	} else {

@@ -360,7 +360,7 @@ void DisplayServerX11::mouse_set_mode(MouseMode p_mode) {
 		return;
 	}
 
-	if (mouse_mode == MOUSE_MODE_CAPTURED || mouse_mode == MOUSE_MODE_CONFINED) {
+	if (mouse_mode == MOUSE_MODE_CAPTURED || mouse_mode == MOUSE_MODE_CONFINED || mouse_mode == MOUSE_MODE_CONFINED_HIDDEN) {
 		XUngrabPointer(x11_display, CurrentTime);
 	}
 
@@ -376,7 +376,7 @@ void DisplayServerX11::mouse_set_mode(MouseMode p_mode) {
 	}
 	mouse_mode = p_mode;
 
-	if (mouse_mode == MOUSE_MODE_CAPTURED || mouse_mode == MOUSE_MODE_CONFINED) {
+	if (mouse_mode == MOUSE_MODE_CAPTURED || mouse_mode == MOUSE_MODE_CONFINED || mouse_mode == MOUSE_MODE_CONFINED_HIDDEN) {
 		//flush pending motion events
 		_flush_mouse_motion();
 		WindowData &main_window = windows[MAIN_WINDOW_ID];
@@ -2166,10 +2166,10 @@ static Atom pick_target_from_atoms(Display *p_disp, Atom p_t1, Atom p_t2, Atom p
 }
 
 void DisplayServerX11::_get_key_modifier_state(unsigned int p_x11_state, Ref<InputEventWithModifiers> state) {
-	state->set_shift((p_x11_state & ShiftMask));
-	state->set_control((p_x11_state & ControlMask));
-	state->set_alt((p_x11_state & Mod1Mask /*|| p_x11_state&Mod5Mask*/)); //altgr should not count as alt
-	state->set_metakey((p_x11_state & Mod4Mask));
+	state->set_shift_pressed((p_x11_state & ShiftMask));
+	state->set_ctrl_pressed((p_x11_state & ControlMask));
+	state->set_alt_pressed((p_x11_state & Mod1Mask /*|| p_x11_state&Mod5Mask*/)); //altgr should not count as alt
+	state->set_meta_pressed((p_x11_state & Mod4Mask));
 }
 
 unsigned int DisplayServerX11::_get_mouse_button_state(unsigned int p_x11_button, int p_x11_type) {
@@ -2281,7 +2281,7 @@ void DisplayServerX11::_handle_key_event(WindowID p_window, XKeyEvent *p_event, 
 					//make it consistent across platforms.
 					k->set_keycode(KEY_TAB);
 					k->set_physical_keycode(KEY_TAB);
-					k->set_shift(true);
+					k->set_shift_pressed(true);
 				}
 
 				Input::get_singleton()->accumulate_input_event(k);
@@ -2409,20 +2409,20 @@ void DisplayServerX11::_handle_key_event(WindowID p_window, XKeyEvent *p_event, 
 		//make it consistent across platforms.
 		k->set_keycode(KEY_TAB);
 		k->set_physical_keycode(KEY_TAB);
-		k->set_shift(true);
+		k->set_shift_pressed(true);
 	}
 
 	//don't set mod state if modifier keys are released by themselves
 	//else event.is_action() will not work correctly here
 	if (!k->is_pressed()) {
 		if (k->get_keycode() == KEY_SHIFT) {
-			k->set_shift(false);
-		} else if (k->get_keycode() == KEY_CONTROL) {
-			k->set_control(false);
+			k->set_shift_pressed(false);
+		} else if (k->get_keycode() == KEY_CTRL) {
+			k->set_ctrl_pressed(false);
 		} else if (k->get_keycode() == KEY_ALT) {
-			k->set_alt(false);
+			k->set_alt_pressed(false);
 		} else if (k->get_keycode() == KEY_META) {
-			k->set_metakey(false);
+			k->set_meta_pressed(false);
 		}
 	}
 
@@ -2606,7 +2606,6 @@ void DisplayServerX11::_window_changed(XEvent *event) {
 	}
 #endif
 
-	print_line("DisplayServer::_window_changed: " + itos(window_id) + " rect: " + new_rect);
 	if (!wd.rect_changed_callback.is_null()) {
 		Rect2i r = new_rect;
 
@@ -2767,7 +2766,7 @@ void DisplayServerX11::process_events() {
 	do_mouse_warp = false;
 
 	// Is the current mouse mode one where it needs to be grabbed.
-	bool mouse_mode_grab = mouse_mode == MOUSE_MODE_CAPTURED || mouse_mode == MOUSE_MODE_CONFINED;
+	bool mouse_mode_grab = mouse_mode == MOUSE_MODE_CAPTURED || mouse_mode == MOUSE_MODE_CONFINED || mouse_mode == MOUSE_MODE_CONFINED_HIDDEN;
 
 	xi.pressure = 0;
 	xi.tilt = Vector2();
@@ -3031,7 +3030,7 @@ void DisplayServerX11::process_events() {
 					for (Map<WindowID, WindowData>::Element *E = windows.front(); E; E = E->next()) {
 						if (mouse_mode == MOUSE_MODE_CONFINED) {
 							XUndefineCursor(x11_display, E->get().x11_window);
-						} else if (mouse_mode == MOUSE_MODE_CAPTURED) { // or re-hide it in captured mode
+						} else if (mouse_mode == MOUSE_MODE_CAPTURED || mouse_mode == MOUSE_MODE_CONFINED_HIDDEN) { // Or re-hide it.
 							XDefineCursor(x11_display, E->get().x11_window, null_cursor);
 						}
 
@@ -3162,14 +3161,14 @@ void DisplayServerX11::process_events() {
 							last_click_ms = 0;
 							last_click_pos = Point2i(-100, -100);
 							last_click_button_index = -1;
-							mb->set_doubleclick(true);
+							mb->set_double_click(true);
 						}
 
 					} else if (mb->get_button_index() < 4 || mb->get_button_index() > 7) {
 						last_click_button_index = mb->get_button_index();
 					}
 
-					if (!mb->is_doubleclick()) {
+					if (!mb->is_double_click()) {
 						last_click_ms += diff;
 						last_click_pos = Point2i(event.xbutton.x, event.xbutton.y);
 					}
@@ -3833,8 +3832,6 @@ DisplayServerX11::WindowID DisplayServerX11::_create_window(WindowMode p_mode, u
 		wd.position.y = xwa.y;
 		wd.size.width = xwa.width;
 		wd.size.height = xwa.height;
-
-		print_line("DisplayServer::_create_window " + itos(id) + " want rect: " + p_rect + " got rect " + Rect2i(xwa.x, xwa.y, xwa.width, xwa.height));
 	}
 
 	//set cursor

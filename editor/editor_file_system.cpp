@@ -31,10 +31,10 @@
 #include "editor_file_system.h"
 
 #include "core/config/project_settings.h"
+#include "core/io/file_access.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
-#include "core/os/file_access.h"
 #include "core/os/os.h"
 #include "core/variant/variant_parser.h"
 #include "editor_node.h"
@@ -66,6 +66,11 @@ int EditorFileSystemDirectory::find_dir_index(const String &p_dir) const {
 	}
 
 	return -1;
+}
+
+void EditorFileSystemDirectory::force_update() {
+	// We set modified_time to 0 to force `EditorFileSystem::_scan_fs_changes` to search changes in the directory
+	modified_time = 0;
 }
 
 int EditorFileSystemDirectory::get_subdir_count() const {
@@ -501,7 +506,7 @@ bool EditorFileSystem::_update_scan_actions() {
 			case ItemAction::ACTION_DIR_ADD: {
 				int idx = 0;
 				for (int i = 0; i < ia.dir->subdirs.size(); i++) {
-					if (ia.new_dir->name < ia.dir->subdirs[i]->name) {
+					if (ia.new_dir->name.naturalnocasecmp_to(ia.dir->subdirs[i]->name) < 0) {
 						break;
 					}
 					idx++;
@@ -523,7 +528,7 @@ bool EditorFileSystem::_update_scan_actions() {
 			case ItemAction::ACTION_FILE_ADD: {
 				int idx = 0;
 				for (int i = 0; i < ia.dir->files.size(); i++) {
-					if (ia.new_file->file < ia.dir->files[i]->file) {
+					if (ia.new_file->file.naturalnocasecmp_to(ia.dir->files[i]->file) < 0) {
 						break;
 					}
 					idx++;
@@ -708,7 +713,7 @@ void EditorFileSystem::_scan_new_dir(EditorFileSystemDirectory *p_dir, DirAccess
 
 				int idx2 = 0;
 				for (int i = 0; i < p_dir->subdirs.size(); i++) {
-					if (efd->name < p_dir->subdirs[i]->name) {
+					if (efd->name.naturalnocasecmp_to(p_dir->subdirs[i]->name) < 0) {
 						break;
 					}
 					idx2++;
@@ -854,9 +859,11 @@ void EditorFileSystem::_scan_fs_changes(EditorFileSystemDirectory *p_dir, const 
 
 		//then scan files and directories and check what's different
 
-		DirAccess *da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
+		DirAccessRef da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
 
-		da->change_dir(cd);
+		Error ret = da->change_dir(cd);
+		ERR_FAIL_COND_MSG(ret != OK, "Cannot change to '" + cd + "' folder.");
+
 		da->list_dir_begin();
 		while (true) {
 			String f = da->get_next();
@@ -944,7 +951,6 @@ void EditorFileSystem::_scan_fs_changes(EditorFileSystemDirectory *p_dir, const 
 		}
 
 		da->list_dir_end();
-		memdelete(da);
 	}
 
 	for (int i = 0; i < p_dir->files.size(); i++) {
@@ -1239,7 +1245,7 @@ bool EditorFileSystem::_find_file(const String &p_file, EditorFileSystemDirector
 
 			int idx2 = 0;
 			for (int j = 0; j < fs->get_subdir_count(); j++) {
-				if (efsd->name < fs->get_subdir(j)->get_name()) {
+				if (efsd->name.naturalnocasecmp_to(fs->get_subdir(j)->get_name()) < 0) {
 					break;
 				}
 				idx2++;
@@ -1475,7 +1481,7 @@ void EditorFileSystem::update_file(const String &p_file) {
 		String file_name = p_file.get_file();
 
 		for (int i = 0; i < fs->files.size(); i++) {
-			if (file_name < fs->files[i]->file) {
+			if (p_file.naturalnocasecmp_to(fs->files[i]->file) < 0) {
 				break;
 			}
 			idx++;

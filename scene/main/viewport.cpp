@@ -197,8 +197,8 @@ void Viewport::update_worlds() {
 }
 
 void Viewport::_collision_object_input_event(CollisionObject3D *p_object, Camera3D *p_camera, const Ref<InputEvent> &p_input_event, const Vector3 &p_pos, const Vector3 &p_normal, int p_shape) {
-	Transform object_transform = p_object->get_global_transform();
-	Transform camera_transform = p_camera->get_global_transform();
+	Transform3D object_transform = p_object->get_global_transform();
+	Transform3D camera_transform = p_camera->get_global_transform();
 	ObjectID id = p_object->get_instance_id();
 
 	//avoid sending the fake event unnecessarily if nothing really changed in the context
@@ -553,7 +553,7 @@ void Viewport::_notification(int p_what) {
 				RS::get_singleton()->multimesh_set_visible_instances(contact_3d_debug_multimesh, point_count);
 
 				for (int i = 0; i < point_count; i++) {
-					Transform point_transform;
+					Transform3D point_transform;
 					point_transform.origin = points[i];
 					RS::get_singleton()->multimesh_instance_set_transform(contact_3d_debug_multimesh, i, point_transform);
 				}
@@ -617,10 +617,10 @@ void Viewport::_process_picking() {
 			mm->set_device(InputEvent::DEVICE_ID_INTERNAL);
 			mm->set_global_position(physics_last_mousepos);
 			mm->set_position(physics_last_mousepos);
-			mm->set_alt(physics_last_mouse_state.alt);
-			mm->set_shift(physics_last_mouse_state.shift);
-			mm->set_control(physics_last_mouse_state.control);
-			mm->set_metakey(physics_last_mouse_state.meta);
+			mm->set_alt_pressed(physics_last_mouse_state.alt);
+			mm->set_shift_pressed(physics_last_mouse_state.shift);
+			mm->set_ctrl_pressed(physics_last_mouse_state.control);
+			mm->set_meta_pressed(physics_last_mouse_state.meta);
 			mm->set_button_mask(physics_last_mouse_state.mouse_mask);
 			physics_picking_events.push_back(mm);
 		}
@@ -641,10 +641,10 @@ void Viewport::_process_picking() {
 
 			physics_has_last_mousepos = true;
 			physics_last_mousepos = pos;
-			physics_last_mouse_state.alt = mm->get_alt();
-			physics_last_mouse_state.shift = mm->get_shift();
-			physics_last_mouse_state.control = mm->get_control();
-			physics_last_mouse_state.meta = mm->get_metakey();
+			physics_last_mouse_state.alt = mm->is_alt_pressed();
+			physics_last_mouse_state.shift = mm->is_shift_pressed();
+			physics_last_mouse_state.control = mm->is_ctrl_pressed();
+			physics_last_mouse_state.meta = mm->is_meta_pressed();
 			physics_last_mouse_state.mouse_mask = mm->get_button_mask();
 		}
 
@@ -656,10 +656,10 @@ void Viewport::_process_picking() {
 
 			physics_has_last_mousepos = true;
 			physics_last_mousepos = pos;
-			physics_last_mouse_state.alt = mb->get_alt();
-			physics_last_mouse_state.shift = mb->get_shift();
-			physics_last_mouse_state.control = mb->get_control();
-			physics_last_mouse_state.meta = mb->get_metakey();
+			physics_last_mouse_state.alt = mb->is_alt_pressed();
+			physics_last_mouse_state.shift = mb->is_shift_pressed();
+			physics_last_mouse_state.control = mb->is_ctrl_pressed();
+			physics_last_mouse_state.meta = mb->is_meta_pressed();
 
 			if (mb->is_pressed()) {
 				physics_last_mouse_state.mouse_mask |= (1 << (mb->get_button_index() - 1));
@@ -676,10 +676,10 @@ void Viewport::_process_picking() {
 		Ref<InputEventKey> k = ev;
 		if (k.is_valid()) {
 			//only for mask
-			physics_last_mouse_state.alt = k->get_alt();
-			physics_last_mouse_state.shift = k->get_shift();
-			physics_last_mouse_state.control = k->get_control();
-			physics_last_mouse_state.meta = k->get_metakey();
+			physics_last_mouse_state.alt = k->is_alt_pressed();
+			physics_last_mouse_state.shift = k->is_shift_pressed();
+			physics_last_mouse_state.control = k->is_ctrl_pressed();
+			physics_last_mouse_state.meta = k->is_meta_pressed();
 			continue;
 		}
 
@@ -1341,19 +1341,19 @@ bool Viewport::is_camera_override_enabled() const {
 	return camera_override;
 }
 
-void Viewport::set_camera_override_transform(const Transform &p_transform) {
+void Viewport::set_camera_override_transform(const Transform3D &p_transform) {
 	if (camera_override) {
 		camera_override.transform = p_transform;
 		RenderingServer::get_singleton()->camera_set_transform(camera_override.rid, p_transform);
 	}
 }
 
-Transform Viewport::get_camera_override_transform() const {
+Transform3D Viewport::get_camera_override_transform() const {
 	if (camera_override) {
 		return camera_override.transform;
 	}
 
-	return Transform();
+	return Transform3D();
 }
 
 void Viewport::set_camera_override_perspective(float p_fovy_degrees, float p_z_near, float p_z_far) {
@@ -1410,6 +1410,16 @@ void Viewport::_update_canvas_items(Node *p_node) {
 	for (int i = 0; i < cc; i++) {
 		_update_canvas_items(p_node->get_child(i));
 	}
+}
+
+void Viewport::set_use_xr(bool p_use_xr) {
+	use_xr = p_use_xr;
+
+	RS::get_singleton()->viewport_set_use_xr(viewport, use_xr);
+}
+
+bool Viewport::is_using_xr() {
+	return use_xr;
 }
 
 Ref<ViewportTexture> Viewport::get_texture() const {
@@ -1830,6 +1840,7 @@ void Viewport::_gui_input_event(Ref<InputEvent> p_event) {
 		Control *over = nullptr;
 
 		Point2 mpos = mb->get_position();
+		gui.last_mouse_pos = mpos;
 		if (mb->is_pressed()) {
 			Size2 pos = mpos;
 			if (gui.mouse_focus_mask) {
@@ -2391,10 +2402,10 @@ void Viewport::_gui_input_event(Ref<InputEvent> p_event) {
 		Control *from = gui.key_focus ? gui.key_focus : nullptr; //hmm
 
 		//keyboard focus
-		//if (from && p_event->is_pressed() && !p_event->get_alt() && !p_event->get_metakey() && !p_event->key->get_command()) {
+		//if (from && p_event->is_pressed() && !p_event->is_alt_pressed() && !p_event->is_meta_pressed() && !p_event->key->is_command_pressed()) {
 		Ref<InputEventKey> k = p_event;
 		//need to check for mods, otherwise any combination of alt/ctrl/shift+<up/down/left/right/etc> is handled here when it shouldn't be.
-		bool mods = k.is_valid() && (k->get_control() || k->get_alt() || k->get_shift() || k->get_metakey());
+		bool mods = k.is_valid() && (k->is_ctrl_pressed() || k->is_alt_pressed() || k->is_shift_pressed() || k->is_meta_pressed());
 
 		if (from && p_event->is_pressed()) {
 			Control *next = nullptr;
@@ -2536,6 +2547,8 @@ void Viewport::_gui_remove_control(Control *p_control) {
 }
 
 Window *Viewport::get_base_window() const {
+	ERR_FAIL_COND_V(!is_inside_tree(), nullptr);
+
 	Viewport *v = const_cast<Viewport *>(this);
 	Window *w = Object::cast_to<Window>(v);
 	while (!w) {
@@ -3325,6 +3338,7 @@ bool Viewport::is_input_handled() const {
 		return local_input_handled;
 	} else {
 		const Viewport *vp = this;
+		ERR_FAIL_COND_V(!is_inside_tree(), false);
 		while (true) {
 			if (Object::cast_to<Window>(vp)) {
 				break;
@@ -3498,6 +3512,9 @@ void Viewport::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_render_info", "info"), &Viewport::get_render_info);
 
+	ClassDB::bind_method(D_METHOD("set_use_xr", "use"), &Viewport::set_use_xr);
+	ClassDB::bind_method(D_METHOD("is_using_xr"), &Viewport::is_using_xr);
+
 	ClassDB::bind_method(D_METHOD("get_texture"), &Viewport::get_texture);
 
 	ClassDB::bind_method(D_METHOD("set_physics_object_picking", "enable"), &Viewport::set_physics_object_picking);
@@ -3578,6 +3595,7 @@ void Viewport::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("_process_picking"), &Viewport::_process_picking);
 
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_xr"), "set_use_xr", "is_using_xr");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "own_world_3d"), "set_use_own_world_3d", "is_using_own_world_3d");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "world_3d", PROPERTY_HINT_RESOURCE_TYPE, "World3D"), "set_world_3d", "get_world_3d");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "world_2d", PROPERTY_HINT_RESOURCE_TYPE, "World2D", 0), "set_world_2d", "get_world_2d");
@@ -3586,14 +3604,14 @@ void Viewport::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "snap_2d_transforms_to_pixel"), "set_snap_2d_transforms_to_pixel", "is_snap_2d_transforms_to_pixel_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "snap_2d_vertices_to_pixel"), "set_snap_2d_vertices_to_pixel", "is_snap_2d_vertices_to_pixel_enabled");
 	ADD_GROUP("Rendering", "");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "msaa", PROPERTY_HINT_ENUM, "Disabled,2x,4x,8x,16x,AndroidVR 2x,AndroidVR 4x"), "set_msaa", "get_msaa");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "screen_space_aa", PROPERTY_HINT_ENUM, "Disabled,FXAA"), "set_screen_space_aa", "get_screen_space_aa");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "msaa", PROPERTY_HINT_ENUM, "Disabled (Fastest),2x (Fast),4x (Average),8x (Slow),16x (Slower)"), "set_msaa", "get_msaa");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "screen_space_aa", PROPERTY_HINT_ENUM, "Disabled (Fastest),FXAA (Fast)"), "set_screen_space_aa", "get_screen_space_aa");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_debanding"), "set_use_debanding", "is_using_debanding");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_occlusion_culling"), "set_use_occlusion_culling", "is_using_occlusion_culling");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "lod_threshold", PROPERTY_HINT_RANGE, "0,1024,0.1"), "set_lod_threshold", "get_lod_threshold");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "debug_draw", PROPERTY_HINT_ENUM, "Disabled,Unshaded,Overdraw,Wireframe"), "set_debug_draw", "get_debug_draw");
 	ADD_GROUP("Canvas Items", "canvas_item_");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "canvas_item_default_texture_filter", PROPERTY_HINT_ENUM, "Nearest,Linear,MipmapLinear,MipmapNearest"), "set_default_canvas_item_texture_filter", "get_default_canvas_item_texture_filter");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "canvas_item_default_texture_filter", PROPERTY_HINT_ENUM, "Nearest,Linear,Linear Mipmap,Nearest Mipmap"), "set_default_canvas_item_texture_filter", "get_default_canvas_item_texture_filter");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "canvas_item_default_texture_repeat", PROPERTY_HINT_ENUM, "Disabled,Enabled,Mirror"), "set_default_canvas_item_texture_repeat", "get_default_canvas_item_texture_repeat");
 	ADD_GROUP("Audio Listener", "audio_listener_");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "audio_listener_enable_2d"), "set_as_audio_listener_2d", "is_audio_listener_2d");
@@ -3654,9 +3672,9 @@ void Viewport::_bind_methods() {
 	BIND_ENUM_CONSTANT(DEBUG_DRAW_OVERDRAW);
 	BIND_ENUM_CONSTANT(DEBUG_DRAW_WIREFRAME);
 	BIND_ENUM_CONSTANT(DEBUG_DRAW_NORMAL_BUFFER);
-	BIND_ENUM_CONSTANT(DEBUG_DRAW_GI_PROBE_ALBEDO);
-	BIND_ENUM_CONSTANT(DEBUG_DRAW_GI_PROBE_LIGHTING);
-	BIND_ENUM_CONSTANT(DEBUG_DRAW_GI_PROBE_EMISSION);
+	BIND_ENUM_CONSTANT(DEBUG_DRAW_VOXEL_GI_ALBEDO);
+	BIND_ENUM_CONSTANT(DEBUG_DRAW_VOXEL_GI_LIGHTING);
+	BIND_ENUM_CONSTANT(DEBUG_DRAW_VOXEL_GI_EMISSION);
 	BIND_ENUM_CONSTANT(DEBUG_DRAW_SHADOW_ATLAS);
 	BIND_ENUM_CONSTANT(DEBUG_DRAW_DIRECTIONAL_SHADOW_ATLAS);
 	BIND_ENUM_CONSTANT(DEBUG_DRAW_SCENE_LUMINANCE);
@@ -3746,16 +3764,6 @@ Viewport::~Viewport() {
 
 /////////////////////////////////
 
-void SubViewport::set_use_xr(bool p_use_xr) {
-	xr = p_use_xr;
-
-	RS::get_singleton()->viewport_set_use_xr(get_viewport_rid(), xr);
-}
-
-bool SubViewport::is_using_xr() {
-	return xr;
-}
-
 void SubViewport::set_size(const Size2i &p_size) {
 	_set_size(p_size, _get_size_2d_override(), Rect2i(), _stretch_transform(), true);
 }
@@ -3828,9 +3836,6 @@ void SubViewport::_notification(int p_what) {
 }
 
 void SubViewport::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_use_xr", "use"), &SubViewport::set_use_xr);
-	ClassDB::bind_method(D_METHOD("is_using_xr"), &SubViewport::is_using_xr);
-
 	ClassDB::bind_method(D_METHOD("set_size", "size"), &SubViewport::set_size);
 	ClassDB::bind_method(D_METHOD("get_size"), &SubViewport::get_size);
 
@@ -3846,7 +3851,6 @@ void SubViewport::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_clear_mode", "mode"), &SubViewport::set_clear_mode);
 	ClassDB::bind_method(D_METHOD("get_clear_mode"), &SubViewport::get_clear_mode);
 
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "xr"), "set_use_xr", "is_using_xr");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "size"), "set_size", "get_size");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "size_2d_override"), "set_size_2d_override", "get_size_2d_override");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "size_2d_override_stretch"), "set_size_2d_override_stretch", "is_size_2d_override_stretch_enabled");

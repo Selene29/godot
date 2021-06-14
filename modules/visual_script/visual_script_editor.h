@@ -135,6 +135,7 @@ class VisualScriptEditor : public ScriptEditorBase {
 		Vector<Pair<Variant::Type, String>> args;
 	};
 
+	Map<StringName, Color> node_colors;
 	HashMap<StringName, Ref<StyleBox>> node_styles;
 
 	void _update_graph_connections();
@@ -316,8 +317,11 @@ public:
 	virtual void set_tooltip_request_func(String p_method, Object *p_obj) override;
 	virtual Control *get_edit_menu() override;
 	virtual void clear_edit_menu() override;
+	virtual void set_find_replace_bar(FindReplaceBar *p_bar) override { p_bar->hide(); }; // Not needed here.
 	virtual bool can_lose_focus_on_node_selection() override { return false; }
 	virtual void validate() override;
+
+	virtual Control *get_base_editor() const override;
 
 	static void register_editor();
 

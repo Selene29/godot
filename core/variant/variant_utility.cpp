@@ -32,7 +32,7 @@
 
 #include "core/core_string_names.h"
 #include "core/io/marshalls.h"
-#include "core/object/reference.h"
+#include "core/object/ref_counted.h"
 #include "core/os/os.h"
 #include "core/templates/oa_hash_map.h"
 #include "core/variant/binder_common.h"
@@ -91,6 +91,10 @@ struct VariantUtilityFunctions {
 
 	static inline double fposmod(double b, double r) {
 		return Math::fposmod(b, r);
+	}
+
+	static inline int64_t posmod(int64_t b, int64_t r) {
+		return Math::posmod(b, r);
 	}
 
 	static inline double floor(double x) {
@@ -1154,6 +1158,7 @@ void Variant::_register_variant_utility_functions() {
 	FUNCBINDR(sqrt, sarray("x"), Variant::UTILITY_FUNC_TYPE_MATH);
 	FUNCBINDR(fmod, sarray("x", "y"), Variant::UTILITY_FUNC_TYPE_MATH);
 	FUNCBINDR(fposmod, sarray("x", "y"), Variant::UTILITY_FUNC_TYPE_MATH);
+	FUNCBINDR(posmod, sarray("x", "y"), Variant::UTILITY_FUNC_TYPE_MATH);
 	FUNCBINDR(floor, sarray("x"), Variant::UTILITY_FUNC_TYPE_MATH);
 	FUNCBINDR(ceil, sarray("x"), Variant::UTILITY_FUNC_TYPE_MATH);
 	FUNCBINDR(round, sarray("x"), Variant::UTILITY_FUNC_TYPE_MATH);

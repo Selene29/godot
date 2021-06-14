@@ -46,9 +46,9 @@ class CollisionObject3D : public Node3D {
 
 	struct ShapeData {
 		Object *owner = nullptr;
-		Transform xform;
+		Transform3D xform;
 		struct ShapeBase {
-			Node *debug_shape = nullptr;
+			RID debug_shape;
 			Ref<Shape3D> shape;
 			int index = 0;
 		};
@@ -65,24 +65,29 @@ class CollisionObject3D : public Node3D {
 	bool ray_pickable = true;
 
 	Set<uint32_t> debug_shapes_to_update;
-	int debug_shape_count = 0;
+	int debug_shapes_count = 0;
+	Transform3D debug_shape_old_transform;
 
 	void _update_pickable();
 
+	bool _are_collision_shapes_visible();
 	void _update_shape_data(uint32_t p_owner);
+	void _shape_changed(const Ref<Shape3D> &p_shape);
+	void _update_debug_shapes();
+	void _clear_debug_shapes();
 
 protected:
 	CollisionObject3D(RID p_rid, bool p_area);
 
 	void _notification(int p_what);
 	static void _bind_methods();
+
+	void _on_transform_changed();
+
 	friend class Viewport;
 	virtual void _input_event(Node *p_camera, const Ref<InputEvent> &p_input_event, const Vector3 &p_pos, const Vector3 &p_normal, int p_shape);
 	virtual void _mouse_enter();
 	virtual void _mouse_exit();
-
-	void _update_debug_shapes();
-	void _clear_debug_shapes();
 
 public:
 	void set_collision_layer(uint32_t p_layer);
@@ -102,8 +107,8 @@ public:
 	void get_shape_owners(List<uint32_t> *r_owners);
 	Array _get_shape_owners();
 
-	void shape_owner_set_transform(uint32_t p_owner, const Transform &p_transform);
-	Transform shape_owner_get_transform(uint32_t p_owner) const;
+	void shape_owner_set_transform(uint32_t p_owner, const Transform3D &p_transform);
+	Transform3D shape_owner_get_transform(uint32_t p_owner) const;
 	Object *shape_owner_get_owner(uint32_t p_owner) const;
 
 	void shape_owner_set_disabled(uint32_t p_owner, bool p_disabled);

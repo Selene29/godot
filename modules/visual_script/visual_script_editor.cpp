@@ -381,7 +381,7 @@ static Color _color_from_type(Variant::Type p_type, bool dark_theme = true) {
 			case Variant::PLANE:
 				color = Color(0.97, 0.44, 0.44);
 				break;
-			case Variant::QUAT:
+			case Variant::QUATERNION:
 				color = Color(0.93, 0.41, 0.64);
 				break;
 			case Variant::AABB:
@@ -390,7 +390,7 @@ static Color _color_from_type(Variant::Type p_type, bool dark_theme = true) {
 			case Variant::BASIS:
 				color = Color(0.89, 0.93, 0.41);
 				break;
-			case Variant::TRANSFORM:
+			case Variant::TRANSFORM3D:
 				color = Color(0.96, 0.66, 0.43);
 				break;
 
@@ -487,7 +487,7 @@ static Color _color_from_type(Variant::Type p_type, bool dark_theme = true) {
 			case Variant::PLANE:
 				color = Color(0.97, 0.44, 0.44);
 				break;
-			case Variant::QUAT:
+			case Variant::QUATERNION:
 				color = Color(0.93, 0.41, 0.64);
 				break;
 			case Variant::AABB:
@@ -496,7 +496,7 @@ static Color _color_from_type(Variant::Type p_type, bool dark_theme = true) {
 			case Variant::BASIS:
 				color = Color(0.7, 0.73, 0.1);
 				break;
-			case Variant::TRANSFORM:
+			case Variant::TRANSFORM3D:
 				color = Color(0.96, 0.56, 0.28);
 				break;
 
@@ -624,7 +624,7 @@ void VisualScriptEditor::_update_graph(int p_only_id) {
 		Control::get_theme_icon("Vector3i", "EditorIcons"),
 		Control::get_theme_icon("Transform2D", "EditorIcons"),
 		Control::get_theme_icon("Plane", "EditorIcons"),
-		Control::get_theme_icon("Quat", "EditorIcons"),
+		Control::get_theme_icon("Quaternion", "EditorIcons"),
 		Control::get_theme_icon("AABB", "EditorIcons"),
 		Control::get_theme_icon("Basis", "EditorIcons"),
 		Control::get_theme_icon("Transform", "EditorIcons"),
@@ -739,22 +739,10 @@ void VisualScriptEditor::_update_graph(int p_only_id) {
 			}
 
 			Color c = sbf->get_border_color();
+			c = ((c.r + c.g + c.b) / 3) < 0.7 ? Color(1.0, 1.0, 1.0, 0.85) : Color(0.0, 0.0, 0.0, 0.85);
 			Color ic = c;
-			c.a = 1;
-			if (EditorSettings::get_singleton()->get("interface/theme/use_graph_node_headers")) {
-				Color mono_color;
-				if (((c.r + c.g + c.b) / 3) < 0.7) {
-					mono_color = Color(1.0, 1.0, 1.0);
-					ic = Color(0.0, 0.0, 0.0, 0.7);
-				} else {
-					mono_color = Color(0.0, 0.0, 0.0);
-					ic = Color(1.0, 1.0, 1.0, 0.7);
-				}
-				mono_color.a = 0.85;
-				c = mono_color;
-			}
 			gnode->add_theme_color_override("title_color", c);
-			c.a = 0.7;
+			c.a = 1;
 			gnode->add_theme_color_override("close_color", c);
 			gnode->add_theme_color_override("resizer_color", ic);
 			gnode->add_theme_style_override("frame", sbf);
@@ -1087,7 +1075,7 @@ void VisualScriptEditor::_update_members() {
 		Control::get_theme_icon("Vector3i", "EditorIcons"),
 		Control::get_theme_icon("Transform2D", "EditorIcons"),
 		Control::get_theme_icon("Plane", "EditorIcons"),
-		Control::get_theme_icon("Quat", "EditorIcons"),
+		Control::get_theme_icon("Quaternion", "EditorIcons"),
 		Control::get_theme_icon("AABB", "EditorIcons"),
 		Control::get_theme_icon("Basis", "EditorIcons"),
 		Control::get_theme_icon("Transform", "EditorIcons"),
@@ -1181,11 +1169,11 @@ void VisualScriptEditor::_member_selected() {
 
 	selected = ti->get_metadata(0);
 
-	if (ti->get_parent() == members->get_root()->get_children()) {
+	if (ti->get_parent() == members->get_root()->get_first_child()) {
 #ifdef OSX_ENABLED
 		bool held_ctrl = Input::get_singleton()->is_key_pressed(KEY_META);
 #else
-		bool held_ctrl = Input::get_singleton()->is_key_pressed(KEY_CONTROL);
+		bool held_ctrl = Input::get_singleton()->is_key_pressed(KEY_CTRL);
 #endif
 		if (held_ctrl) {
 			ERR_FAIL_COND(!script->has_function(selected));
@@ -1227,7 +1215,7 @@ void VisualScriptEditor::_member_edited() {
 
 	TreeItem *root = members->get_root();
 
-	if (ti->get_parent() == root->get_children()) {
+	if (ti->get_parent() == root->get_first_child()) {
 		selected = new_name;
 
 		int node_id = script->get_function_node_id(name);
@@ -1268,7 +1256,7 @@ void VisualScriptEditor::_member_edited() {
 		return; // Or crash because it will become invalid.
 	}
 
-	if (ti->get_parent() == root->get_children()->get_next()) {
+	if (ti->get_parent() == root->get_first_child()->get_next()) {
 		selected = new_name;
 		undo_redo->create_action(TTR("Rename Variable"));
 		undo_redo->add_do_method(script.ptr(), "rename_variable", name, new_name);
@@ -1284,7 +1272,7 @@ void VisualScriptEditor::_member_edited() {
 		return; // Or crash because it will become invalid.
 	}
 
-	if (ti->get_parent() == root->get_children()->get_next()->get_next()) {
+	if (ti->get_parent() == root->get_first_child()->get_next()->get_next()) {
 		selected = new_name;
 		undo_redo->create_action(TTR("Rename Signal"));
 		undo_redo->add_do_method(script.ptr(), "rename_custom_signal", name, new_name);
@@ -1418,7 +1406,7 @@ void VisualScriptEditor::_member_button(Object *p_item, int p_column, int p_butt
 
 	if (ti->get_parent() == root) {
 		//main buttons
-		if (ti == root->get_children()) {
+		if (ti == root->get_first_child()) {
 			// Add function, this one uses menu.
 
 			if (p_button == 1) {
@@ -1455,7 +1443,7 @@ void VisualScriptEditor::_member_button(Object *p_item, int p_column, int p_butt
 			return; // Or crash because it will become invalid.
 		}
 
-		if (ti == root->get_children()->get_next()) {
+		if (ti == root->get_first_child()->get_next()) {
 			// Add variable.
 			String name = _validate_name("new_variable");
 			selected = name;
@@ -1471,7 +1459,7 @@ void VisualScriptEditor::_member_button(Object *p_item, int p_column, int p_butt
 			return; // Or crash because it will become invalid.
 		}
 
-		if (ti == root->get_children()->get_next()->get_next()) {
+		if (ti == root->get_first_child()->get_next()->get_next()) {
 			// Add variable.
 			String name = _validate_name("new_signal");
 			selected = name;
@@ -1486,7 +1474,7 @@ void VisualScriptEditor::_member_button(Object *p_item, int p_column, int p_butt
 			undo_redo->commit_action();
 			return; // Or crash because it will become invalid.
 		}
-	} else if (ti->get_parent() == root->get_children()) {
+	} else if (ti->get_parent() == root->get_first_child()) {
 		selected = ti->get_text(0);
 		function_name_edit->set_position(Input::get_singleton()->get_mouse_position() - Vector2(60, -10));
 		function_name_edit->popup();
@@ -1854,18 +1842,18 @@ void VisualScriptEditor::_members_gui_input(const Ref<InputEvent> &p_event) {
 			TreeItem *ti = members->get_selected();
 			if (ti) {
 				TreeItem *root = members->get_root();
-				if (ti->get_parent() == root->get_children()) {
+				if (ti->get_parent() == root->get_first_child()) {
 					member_type = MEMBER_FUNCTION;
 				}
-				if (ti->get_parent() == root->get_children()->get_next()) {
+				if (ti->get_parent() == root->get_first_child()->get_next()) {
 					member_type = MEMBER_VARIABLE;
 				}
-				if (ti->get_parent() == root->get_children()->get_next()->get_next()) {
+				if (ti->get_parent() == root->get_first_child()->get_next()->get_next()) {
 					member_type = MEMBER_SIGNAL;
 				}
 				member_name = ti->get_text(0);
 			}
-			if (ED_IS_SHORTCUT("visual_script_editor/delete_selected", p_event)) {
+			if (ED_IS_SHORTCUT("ui_graph_delete", p_event)) {
 				_member_option(MEMBER_REMOVE);
 			}
 			if (ED_IS_SHORTCUT("visual_script_editor/edit_member", p_event)) {
@@ -1875,9 +1863,9 @@ void VisualScriptEditor::_members_gui_input(const Ref<InputEvent> &p_event) {
 	}
 
 	Ref<InputEventMouseButton> btn = p_event;
-	if (btn.is_valid() && btn->is_doubleclick()) {
+	if (btn.is_valid() && btn->is_double_click()) {
 		TreeItem *ti = members->get_selected();
-		if (ti && ti->get_parent() == members->get_root()->get_children()) { // to check if it's a function
+		if (ti && ti->get_parent() == members->get_root()->get_first_child()) { // to check if it's a function
 			_center_on_node(script->get_function_node_id(ti->get_metadata(0)));
 		}
 	}
@@ -1959,13 +1947,13 @@ Variant VisualScriptEditor::get_drag_data_fw(const Point2 &p_point, Control *p_f
 		Dictionary dd;
 		TreeItem *root = members->get_root();
 
-		if (it->get_parent() == root->get_children()) {
+		if (it->get_parent() == root->get_first_child()) {
 			dd["type"] = "visual_script_function_drag";
 			dd["function"] = type;
-		} else if (it->get_parent() == root->get_children()->get_next()) {
+		} else if (it->get_parent() == root->get_first_child()->get_next()) {
 			dd["type"] = "visual_script_variable_drag";
 			dd["variable"] = type;
-		} else if (it->get_parent() == root->get_children()->get_next()->get_next()) {
+		} else if (it->get_parent() == root->get_first_child()->get_next()->get_next()) {
 			dd["type"] = "visual_script_signal_drag";
 			dd["signal"] = type;
 
@@ -2083,7 +2071,7 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 #ifdef OSX_ENABLED
 		bool use_set = Input::get_singleton()->is_key_pressed(KEY_META);
 #else
-		bool use_set = Input::get_singleton()->is_key_pressed(KEY_CONTROL);
+		bool use_set = Input::get_singleton()->is_key_pressed(KEY_CTRL);
 #endif
 		Vector2 ofs = graph->get_scroll_ofs() + p_point;
 		if (graph->is_using_snap()) {
@@ -2271,7 +2259,7 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 #ifdef OSX_ENABLED
 		bool use_node = Input::get_singleton()->is_key_pressed(KEY_META);
 #else
-		bool use_node = Input::get_singleton()->is_key_pressed(KEY_CONTROL);
+		bool use_node = Input::get_singleton()->is_key_pressed(KEY_CTRL);
 #endif
 
 		Array nodes = d["nodes"];
@@ -2354,7 +2342,7 @@ void VisualScriptEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 #ifdef OSX_ENABLED
 		bool use_get = Input::get_singleton()->is_key_pressed(KEY_META);
 #else
-		bool use_get = Input::get_singleton()->is_key_pressed(KEY_CONTROL);
+		bool use_get = Input::get_singleton()->is_key_pressed(KEY_CTRL);
 #endif
 
 		if (!node || Input::get_singleton()->is_key_pressed(KEY_SHIFT)) {
@@ -2721,6 +2709,10 @@ void VisualScriptEditor::set_debugger_active(bool p_active) {
 		error_line = -1;
 		_update_graph(); //clear line break
 	}
+}
+
+Control *VisualScriptEditor::get_base_editor() const {
+	return graph;
 }
 
 void VisualScriptEditor::set_tooltip_request_func(String p_method, Object *p_obj) {
@@ -3623,32 +3615,33 @@ void VisualScriptEditor::_notification(int p_what) {
 
 			bool dark_theme = tm->get_constant("dark_theme", "Editor");
 
-			List<Pair<String, Color>> colors;
 			if (dark_theme) {
-				colors.push_back(Pair<String, Color>("flow_control", Color(0.96, 0.96, 0.96)));
-				colors.push_back(Pair<String, Color>("functions", Color(0.96, 0.52, 0.51)));
-				colors.push_back(Pair<String, Color>("data", Color(0.5, 0.96, 0.81)));
-				colors.push_back(Pair<String, Color>("operators", Color(0.67, 0.59, 0.87)));
-				colors.push_back(Pair<String, Color>("custom", Color(0.5, 0.73, 0.96)));
-				colors.push_back(Pair<String, Color>("constants", Color(0.96, 0.5, 0.69)));
+				node_colors["flow_control"] = Color(0.96, 0.96, 0.96);
+				node_colors["functions"] = Color(0.96, 0.52, 0.51);
+				node_colors["data"] = Color(0.5, 0.96, 0.81);
+				node_colors["operators"] = Color(0.67, 0.59, 0.87);
+				node_colors["custom"] = Color(0.5, 0.73, 0.96);
+				node_colors["constants"] = Color(0.96, 0.5, 0.69);
 			} else {
-				colors.push_back(Pair<String, Color>("flow_control", Color(0.26, 0.26, 0.26)));
-				colors.push_back(Pair<String, Color>("functions", Color(0.95, 0.4, 0.38)));
-				colors.push_back(Pair<String, Color>("data", Color(0.07, 0.73, 0.51)));
-				colors.push_back(Pair<String, Color>("operators", Color(0.51, 0.4, 0.82)));
-				colors.push_back(Pair<String, Color>("custom", Color(0.31, 0.63, 0.95)));
-				colors.push_back(Pair<String, Color>("constants", Color(0.94, 0.18, 0.49)));
+				node_colors["flow_control"] = Color(0.26, 0.26, 0.26);
+				node_colors["functions"] = Color(0.95, 0.4, 0.38);
+				node_colors["data"] = Color(0.07, 0.73, 0.51);
+				node_colors["operators"] = Color(0.51, 0.4, 0.82);
+				node_colors["custom"] = Color(0.31, 0.63, 0.95);
+				node_colors["constants"] = Color(0.94, 0.18, 0.49);
 			}
 
-			for (List<Pair<String, Color>>::Element *E = colors.front(); E; E = E->next()) {
-				Ref<StyleBoxFlat> sb = tm->get_stylebox("frame", "GraphNode");
+			for (Map<StringName, Color>::Element *E = node_colors.front(); E; E = E->next()) {
+				const Ref<StyleBoxFlat> sb = tm->get_stylebox("frame", "GraphNode");
+
 				if (!sb.is_null()) {
 					Ref<StyleBoxFlat> frame_style = sb->duplicate();
-					Color c = sb->get_border_color();
-					Color cn = E->get().second;
-					cn.a = c.a;
-					frame_style->set_border_color(cn);
-					node_styles[E->get().first] = frame_style;
+					// Adjust the border color to be close to the GraphNode's background color.
+					// This keeps the node's title area from being too distracting.
+					Color color = dark_theme ? E->get().darkened(0.75) : E->get().lightened(0.75);
+					color.a = 0.9;
+					frame_style->set_border_color(color);
+					node_styles[E->key()] = frame_style;
 				}
 			}
 
@@ -4123,32 +4116,32 @@ void VisualScriptEditor::_member_rmb_selected(const Vector2 &p_pos) {
 
 	Ref<Texture2D> edit_icon = Control::get_theme_icon("Edit", "EditorIcons");
 
-	if (ti->get_parent() == root->get_children()) {
+	if (ti->get_parent() == root->get_first_child()) {
 		member_type = MEMBER_FUNCTION;
 		member_name = ti->get_text(0);
 		member_popup->add_icon_shortcut(edit_icon, ED_GET_SHORTCUT("visual_script_editor/edit_member"), MEMBER_EDIT);
 		member_popup->add_separator();
-		member_popup->add_icon_shortcut(del_icon, ED_GET_SHORTCUT("visual_script_editor/delete_selected"), MEMBER_REMOVE);
+		member_popup->add_icon_shortcut(del_icon, ED_GET_SHORTCUT("ui_graph_delete"), MEMBER_REMOVE);
 		member_popup->popup();
 		return;
 	}
 
-	if (ti->get_parent() == root->get_children()->get_next()) {
+	if (ti->get_parent() == root->get_first_child()->get_next()) {
 		member_type = MEMBER_VARIABLE;
 		member_name = ti->get_text(0);
 		member_popup->add_icon_shortcut(edit_icon, ED_GET_SHORTCUT("visual_script_editor/edit_member"), MEMBER_EDIT);
 		member_popup->add_separator();
-		member_popup->add_icon_shortcut(del_icon, ED_GET_SHORTCUT("visual_script_editor/delete_selected"), MEMBER_REMOVE);
+		member_popup->add_icon_shortcut(del_icon, ED_GET_SHORTCUT("ui_graph_delete"), MEMBER_REMOVE);
 		member_popup->popup();
 		return;
 	}
 
-	if (ti->get_parent() == root->get_children()->get_next()->get_next()) {
+	if (ti->get_parent() == root->get_first_child()->get_next()->get_next()) {
 		member_type = MEMBER_SIGNAL;
 		member_name = ti->get_text(0);
 		member_popup->add_icon_shortcut(edit_icon, ED_GET_SHORTCUT("visual_script_editor/edit_member"), MEMBER_EDIT);
 		member_popup->add_separator();
-		member_popup->add_icon_shortcut(del_icon, ED_GET_SHORTCUT("visual_script_editor/delete_selected"), MEMBER_REMOVE);
+		member_popup->add_icon_shortcut(del_icon, ED_GET_SHORTCUT("ui_graph_delete"), MEMBER_REMOVE);
 		member_popup->popup();
 		return;
 	}
@@ -4250,9 +4243,9 @@ void VisualScriptEditor::_bind_methods() {
 
 	ClassDB::bind_method("_create_new_node_from_name", &VisualScriptEditor::_create_new_node_from_name);
 
-	ClassDB::bind_method("get_drag_data_fw", &VisualScriptEditor::get_drag_data_fw);
-	ClassDB::bind_method("can_drop_data_fw", &VisualScriptEditor::can_drop_data_fw);
-	ClassDB::bind_method("drop_data_fw", &VisualScriptEditor::drop_data_fw);
+	ClassDB::bind_method("_get_drag_data_fw", &VisualScriptEditor::get_drag_data_fw);
+	ClassDB::bind_method("_can_drop_data_fw", &VisualScriptEditor::can_drop_data_fw);
+	ClassDB::bind_method("_drop_data_fw", &VisualScriptEditor::drop_data_fw);
 
 	ClassDB::bind_method("_input", &VisualScriptEditor::_input);
 
