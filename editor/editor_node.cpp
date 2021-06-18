@@ -609,7 +609,7 @@ void EditorNode::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_APPLICATION_FOCUS_IN: {
-			// Restore the original FPS cap after focusing back on the editor
+			// Restore the original FPS cap after focusing back on the editor.
 			OS::get_singleton()->set_low_processor_usage_mode_sleep_usec(int(EDITOR_GET("interface/editor/low_processor_mode_sleep_usec")));
 
 			EditorFileSystem::get_singleton()->scan_changes();
@@ -617,7 +617,12 @@ void EditorNode::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_APPLICATION_FOCUS_OUT: {
-			// Set a low FPS cap to decrease CPU/GPU usage while the editor is unfocused
+			// Save on focus loss before applying the FPS limit to avoid slowing down the saving process.
+			if (EDITOR_GET("interface/editor/save_on_focus_loss")) {
+				_menu_option_confirm(FILE_SAVE_SCENE, false);
+			}
+
+			// Set a low FPS cap to decrease CPU/GPU usage while the editor is unfocused.
 			OS::get_singleton()->set_low_processor_usage_mode_sleep_usec(int(EDITOR_GET("interface/editor/unfocused_low_processor_mode_sleep_usec")));
 		} break;
 
@@ -2693,6 +2698,9 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 		case FILE_EXPLORE_ANDROID_BUILD_TEMPLATES: {
 			OS::get_singleton()->shell_open("file://" + ProjectSettings::get_singleton()->get_resource_path().plus_file("android"));
 		} break;
+		case RUN_RELOAD_CURRENT_PROJECT: {
+			restart_editor();
+		} break;
 		case FILE_QUIT:
 		case RUN_PROJECT_MANAGER: {
 			if (!p_confirmed) {
@@ -3726,10 +3734,6 @@ bool EditorNode::is_scene_in_use(const String &p_path) {
 		return _find_scene_in_use(es, p_path);
 	}
 	return false;
-}
-
-void EditorNode::register_editor_paths(bool p_for_project_manager) {
-	EditorPaths::create(p_for_project_manager);
 }
 
 void EditorNode::register_editor_types() {
@@ -5690,34 +5694,10 @@ EditorNode::EditorNode() {
 		int display_scale = EditorSettings::get_singleton()->get("interface/editor/display_scale");
 
 		switch (display_scale) {
-			case 0: {
+			case 0:
 				// Try applying a suitable display scale automatically.
-				// The code below is adapted in `editor/editor_settings.cpp` and `editor/project_manager.cpp`.
-				// Make sure to update those when modifying the code below.
-#ifdef OSX_ENABLED
-				editor_set_scale(DisplayServer::get_singleton()->screen_get_max_scale());
-#else
-				const int screen = DisplayServer::get_singleton()->window_get_current_screen();
-				float scale;
-				if (DisplayServer::get_singleton()->screen_get_dpi(screen) >= 192 && DisplayServer::get_singleton()->screen_get_size(screen).y >= 1400) {
-					// hiDPI display.
-					scale = 2.0;
-				} else if (DisplayServer::get_singleton()->screen_get_size(screen).y >= 1700) {
-					// Likely a hiDPI display, but we aren't certain due to the returned DPI.
-					// Use an intermediate scale to handle this situation.
-					scale = 1.5;
-				} else if (DisplayServer::get_singleton()->screen_get_size(screen).y <= 800) {
-					// Small loDPI display. Use a smaller display scale so that editor elements fit more easily.
-					// Icons won't look great, but this is better than having editor elements overflow from its window.
-					scale = 0.75;
-				} else {
-					scale = 1.0;
-				}
-
-				editor_set_scale(scale);
-#endif
-			} break;
-
+				editor_set_scale(EditorSettings::get_singleton()->get_auto_display_scale());
+				break;
 			case 1:
 				editor_set_scale(0.75);
 				break;
@@ -5870,6 +5850,7 @@ EditorNode::EditorNode() {
 	EDITOR_DEF("run/output/always_open_output_on_play", true);
 	EDITOR_DEF("run/output/always_close_output_on_stop", true);
 	EDITOR_DEF("run/auto_save/save_before_running", true);
+	EDITOR_DEF("interface/editor/save_on_focus_loss", false);
 	EDITOR_DEF_RST("interface/editor/save_each_scene_on_quit", true);
 	EDITOR_DEF("interface/editor/show_update_spinner", false);
 	EDITOR_DEF("interface/editor/update_continuously", false);
@@ -6292,6 +6273,7 @@ EditorNode::EditorNode() {
 	tool_menu->add_item(TTR("Orphan Resource Explorer..."), TOOLS_ORPHAN_RESOURCES);
 
 	p->add_separator();
+	p->add_item(TTR("Reload Current Project"), RUN_RELOAD_CURRENT_PROJECT);
 #ifdef OSX_ENABLED
 	p->add_shortcut(ED_SHORTCUT("editor/quit_to_project_list", TTR("Quit to Project List"), KEY_MASK_SHIFT + KEY_MASK_ALT + KEY_Q), RUN_PROJECT_MANAGER, true);
 #else

@@ -529,6 +529,12 @@ public:
 	FUNC1(particles_collision_height_field_update, RID)
 	FUNC2(particles_collision_set_height_field_resolution, RID, ParticlesCollisionHeightfieldResolution)
 
+	/* VISIBILITY_NOTIFIER */
+
+	FUNCRIDSPLIT(visibility_notifier)
+	FUNC2(visibility_notifier_set_aabb, RID, const AABB &)
+	FUNC3(visibility_notifier_set_callbacks, RID, const Callable &, const Callable &)
+
 #undef server_name
 #undef ServerName
 //from now on, calls forwarded to this singleton
@@ -549,7 +555,7 @@ public:
 
 	/* OCCLUDER */
 	FUNCRIDSPLIT(occluder)
-	FUNC3(occluder_set_mesh, RID, const PackedVector3Array &, const PackedInt32Array &);
+	FUNC3(occluder_set_mesh, RID, const PackedVector3Array &, const PackedInt32Array &)
 
 #undef server_name
 #undef ServerName
@@ -726,6 +732,7 @@ public:
 	FUNC2(instance_set_exterior, RID, bool)
 
 	FUNC2(instance_set_extra_visibility_margin, RID, real_t)
+	FUNC2(instance_set_visibility_parent, RID, RID)
 
 	// don't use these in a game!
 	FUNC2RC(Vector<ObjectID>, instances_cull_aabb, const AABB &, RID)
@@ -736,8 +743,7 @@ public:
 	FUNC2(instance_geometry_set_cast_shadows_setting, RID, ShadowCastingSetting)
 	FUNC2(instance_geometry_set_material_override, RID, RID)
 
-	FUNC5(instance_geometry_set_draw_range, RID, float, float, float, float)
-	FUNC2(instance_geometry_set_as_instance_lod, RID, RID)
+	FUNC5(instance_geometry_set_visibility_range, RID, float, float, float, float)
 	FUNC4(instance_geometry_set_lightmap, RID, RID, const Rect2 &, int)
 	FUNC2(instance_geometry_set_lod_bias, RID, float)
 
@@ -807,6 +813,8 @@ public:
 	FUNC3(canvas_item_add_particles, RID, RID, RID)
 	FUNC2(canvas_item_add_set_transform, RID, const Transform2D &)
 	FUNC2(canvas_item_add_clip_ignore, RID, bool)
+	FUNC5(canvas_item_add_animation_slice, RID, double, double, double, double)
+
 	FUNC2(canvas_item_set_sort_children_by_y, RID, bool)
 	FUNC2(canvas_item_set_z_index, RID, int)
 	FUNC2(canvas_item_set_z_as_relative_to_parent, RID, bool)
@@ -819,6 +827,8 @@ public:
 	FUNC2(canvas_item_set_material, RID, RID)
 
 	FUNC2(canvas_item_set_use_parent_material, RID, bool)
+
+	FUNC5(canvas_item_set_visibility_notifier, RID, bool, const Rect2 &, const Callable &, const Callable &)
 
 	FUNC6(canvas_item_set_canvas_group_mode, RID, CanvasGroupMode, float, bool, float, bool)
 

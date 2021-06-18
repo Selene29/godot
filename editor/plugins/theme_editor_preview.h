@@ -1,5 +1,5 @@
 /*************************************************************************/
-/*  visibility_notifier_3d.h                                             */
+/*  theme_editor_preview.h                                               */
 /*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
@@ -28,74 +28,91 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
 
-#ifndef VISIBILITY_NOTIFIER_H
-#define VISIBILITY_NOTIFIER_H
+#ifndef THEME_EDITOR_PREVIEW_H
+#define THEME_EDITOR_PREVIEW_H
 
-#include "scene/3d/node_3d.h"
+#include "scene/gui/box_container.h"
+#include "scene/gui/check_box.h"
+#include "scene/gui/check_button.h"
+#include "scene/gui/color_picker.h"
+#include "scene/gui/color_rect.h"
+#include "scene/gui/label.h"
+#include "scene/gui/margin_container.h"
+#include "scene/gui/menu_button.h"
+#include "scene/gui/option_button.h"
+#include "scene/gui/panel.h"
+#include "scene/gui/progress_bar.h"
+#include "scene/gui/scroll_container.h"
+#include "scene/gui/separator.h"
+#include "scene/gui/spin_box.h"
+#include "scene/gui/tab_container.h"
+#include "scene/gui/text_edit.h"
+#include "scene/gui/tree.h"
+#include "scene/resources/theme.h"
 
-class World3D;
-class Camera3D;
-class VisibilityNotifier3D : public Node3D {
-	GDCLASS(VisibilityNotifier3D, Node3D);
+#include "editor/editor_node.h"
 
-	Ref<World3D> world;
-	Set<Camera3D *> cameras;
+class ThemeEditorPreview : public VBoxContainer {
+	GDCLASS(ThemeEditorPreview, VBoxContainer);
 
-	AABB aabb = AABB(Vector3(-1, -1, -1), Vector3(2, 2, 2));
+	ColorRect *preview_bg;
+	MarginContainer *preview_overlay;
+	Control *picker_overlay;
+	Control *hovered_control = nullptr;
+
+	double time_left = 0;
+
+	void _propagate_redraw(Control *p_at);
+	void _refresh_interval();
+	void _preview_visibility_changed();
+
+	void _picker_button_cbk();
+	Control *_find_hovered_control(Control *p_parent, Vector2 p_mouse_position);
+
+	void _draw_picker_overlay();
+	void _gui_input_picker_overlay(const Ref<InputEvent> &p_event);
 
 protected:
-	virtual void _screen_enter() {}
-	virtual void _screen_exit() {}
+	HBoxContainer *preview_toolbar;
+	MarginContainer *preview_content;
+	Button *picker_button;
 
-	void _notification(int p_what);
-	static void _bind_methods();
-	friend struct SpatialIndexer;
-
-	void _enter_camera(Camera3D *p_camera);
-	void _exit_camera(Camera3D *p_camera);
-
-public:
-	void set_aabb(const AABB &p_aabb);
-	AABB get_aabb() const;
-	bool is_on_screen() const;
-
-	VisibilityNotifier3D();
-};
-
-class VisibilityEnabler3D : public VisibilityNotifier3D {
-	GDCLASS(VisibilityEnabler3D, VisibilityNotifier3D);
-
-public:
-	enum Enabler {
-		ENABLER_PAUSE_ANIMATIONS,
-		ENABLER_FREEZE_BODIES,
-		ENABLER_MAX
-	};
-
-protected:
-	virtual void _screen_enter() override;
-	virtual void _screen_exit() override;
-
-	bool visible = false;
-
-	void _find_nodes(Node *p_node);
-
-	Map<Node *, Variant> nodes;
-	void _node_removed(Node *p_node);
-	bool enabler[ENABLER_MAX];
-
-	void _change_node_state(Node *p_node, bool p_enabled);
+	void add_preview_overlay(Control *p_overlay);
 
 	void _notification(int p_what);
 	static void _bind_methods();
 
 public:
-	void set_enabler(Enabler p_enabler, bool p_enable);
-	bool is_enabler_enabled(Enabler p_enabler) const;
+	void set_preview_theme(const Ref<Theme> &p_theme);
 
-	VisibilityEnabler3D();
+	ThemeEditorPreview();
 };
 
-VARIANT_ENUM_CAST(VisibilityEnabler3D::Enabler);
+class DefaultThemeEditorPreview : public ThemeEditorPreview {
+	GDCLASS(DefaultThemeEditorPreview, ThemeEditorPreview);
 
-#endif // VISIBILITY_NOTIFIER_H
+public:
+	DefaultThemeEditorPreview();
+};
+
+class SceneThemeEditorPreview : public ThemeEditorPreview {
+	GDCLASS(SceneThemeEditorPreview, ThemeEditorPreview);
+
+	Ref<PackedScene> loaded_scene;
+
+	Button *reload_scene_button;
+
+	void _reload_scene();
+
+protected:
+	void _notification(int p_what);
+	static void _bind_methods();
+
+public:
+	bool set_preview_scene(const String &p_path);
+	String get_preview_scene_path() const;
+
+	SceneThemeEditorPreview();
+};
+
+#endif // THEME_EDITOR_PREVIEW_H

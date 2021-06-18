@@ -722,6 +722,17 @@ public:
 
 	virtual void particles_collision_set_height_field_resolution(RID p_particles_collision, ParticlesCollisionHeightfieldResolution p_resolution) = 0; //for SDF and vector field
 
+	/* VISIBILITY NOTIFIER API */
+
+	virtual RID visibility_notifier_create() = 0;
+	virtual void visibility_notifier_set_aabb(RID p_notifier, const AABB &p_aabb) = 0;
+	virtual void visibility_notifier_set_callbacks(RID p_notifier, const Callable &p_enter_callbable, const Callable &p_exit_callable) = 0;
+
+	/* OCCLUDER API */
+
+	virtual RID occluder_create() = 0;
+	virtual void occluder_set_mesh(RID p_occluder, const PackedVector3Array &p_vertices, const PackedInt32Array &p_indices) = 0;
+
 	/* CAMERA API */
 
 	virtual RID camera_create() = 0;
@@ -733,11 +744,6 @@ public:
 	virtual void camera_set_environment(RID p_camera, RID p_env) = 0;
 	virtual void camera_set_camera_effects(RID p_camera, RID p_camera_effects) = 0;
 	virtual void camera_set_use_vertical_aspect(RID p_camera, bool p_enable) = 0;
-
-	/* OCCLUDER API */
-
-	virtual RID occluder_create() = 0;
-	virtual void occluder_set_mesh(RID p_occluder, const PackedVector3Array &p_vertices, const PackedInt32Array &p_indices) = 0;
 
 	/* VIEWPORT TARGET API */
 
@@ -1148,6 +1154,7 @@ public:
 		INSTANCE_VOXEL_GI,
 		INSTANCE_LIGHTMAP,
 		INSTANCE_OCCLUDER,
+		INSTANCE_VISIBLITY_NOTIFIER,
 		INSTANCE_MAX,
 
 		INSTANCE_GEOMETRY_MASK = (1 << INSTANCE_MESH) | (1 << INSTANCE_MULTIMESH) | (1 << INSTANCE_IMMEDIATE) | (1 << INSTANCE_PARTICLES)
@@ -1172,6 +1179,7 @@ public:
 	virtual void instance_set_exterior(RID p_instance, bool p_enabled) = 0;
 
 	virtual void instance_set_extra_visibility_margin(RID p_instance, real_t p_margin) = 0;
+	virtual void instance_set_visibility_parent(RID p_instance, RID p_parent_instance) = 0;
 
 	// don't use these in a game!
 	virtual Vector<ObjectID> instances_cull_aabb(const AABB &p_aabb, RID p_scenario = RID()) const = 0;
@@ -1201,8 +1209,7 @@ public:
 	virtual void instance_geometry_set_cast_shadows_setting(RID p_instance, ShadowCastingSetting p_shadow_casting_setting) = 0;
 	virtual void instance_geometry_set_material_override(RID p_instance, RID p_material) = 0;
 
-	virtual void instance_geometry_set_draw_range(RID p_instance, float p_min, float p_max, float p_min_margin, float p_max_margin) = 0;
-	virtual void instance_geometry_set_as_instance_lod(RID p_instance, RID p_as_lod_of_instance) = 0;
+	virtual void instance_geometry_set_visibility_range(RID p_instance, float p_min, float p_max, float p_min_margin, float p_max_margin) = 0;
 	virtual void instance_geometry_set_lightmap(RID p_instance, RID p_lightmap, const Rect2 &p_lightmap_uv_scale, int p_lightmap_slice) = 0;
 	virtual void instance_geometry_set_lod_bias(RID p_instance, float p_lod_bias) = 0;
 
@@ -1287,6 +1294,7 @@ public:
 	virtual void canvas_item_add_particles(RID p_item, RID p_particles, RID p_texture) = 0;
 	virtual void canvas_item_add_set_transform(RID p_item, const Transform2D &p_transform) = 0;
 	virtual void canvas_item_add_clip_ignore(RID p_item, bool p_ignore) = 0;
+	virtual void canvas_item_add_animation_slice(RID p_item, double p_animation_length, double p_slice_begin, double p_slice_end, double p_offset) = 0;
 	virtual void canvas_item_set_sort_children_by_y(RID p_item, bool p_enable) = 0;
 	virtual void canvas_item_set_z_index(RID p_item, int p_z) = 0;
 	virtual void canvas_item_set_z_as_relative_to_parent(RID p_item, bool p_enable) = 0;
@@ -1300,6 +1308,8 @@ public:
 	virtual void canvas_item_set_material(RID p_item, RID p_material) = 0;
 
 	virtual void canvas_item_set_use_parent_material(RID p_item, bool p_enable) = 0;
+
+	virtual void canvas_item_set_visibility_notifier(RID p_item, bool p_enable, const Rect2 &p_area, const Callable &p_enter_callbable, const Callable &p_exit_callable) = 0;
 
 	enum CanvasGroupMode {
 		CANVAS_GROUP_MODE_DISABLED,
