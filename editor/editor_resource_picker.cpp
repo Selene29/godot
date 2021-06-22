@@ -271,7 +271,7 @@ void EditorResourcePicker::_edit_menu_cbk(int p_which) {
 			}
 
 			String orig_type = edited_resource->get_class();
-			Object *inst = ClassDB::instance(orig_type);
+			Object *inst = ClassDB::instantiate(orig_type);
 			Ref<Resource> unique_resource = Ref<Resource>(Object::cast_to<Resource>(inst));
 			ERR_FAIL_COND(unique_resource.is_null());
 
@@ -334,7 +334,7 @@ void EditorResourcePicker::_edit_menu_cbk(int p_which) {
 			Variant obj;
 
 			if (ScriptServer::is_global_class(intype)) {
-				obj = ClassDB::instance(ScriptServer::get_global_class_native_base(intype));
+				obj = ClassDB::instantiate(ScriptServer::get_global_class_native_base(intype));
 				if (obj) {
 					Ref<Script> script = ResourceLoader::load(ScriptServer::get_global_class_path(intype));
 					if (script.is_valid()) {
@@ -342,7 +342,7 @@ void EditorResourcePicker::_edit_menu_cbk(int p_which) {
 					}
 				}
 			} else {
-				obj = ClassDB::instance(intype);
+				obj = ClassDB::instantiate(intype);
 			}
 
 			if (!obj) {
@@ -395,7 +395,7 @@ void EditorResourcePicker::set_create_options(Object *p_menu_node) {
 				}
 			}
 
-			if (!is_custom_resource && !(ScriptServer::is_global_class(t) || ClassDB::can_instance(t))) {
+			if (!is_custom_resource && !(ScriptServer::is_global_class(t) || ClassDB::can_instantiate(t))) {
 				continue;
 			}
 
@@ -644,7 +644,7 @@ void EditorResourcePicker::_bind_methods() {
 	ClassDB::add_virtual_method(get_class_static(), MethodInfo("_handle_menu_selected", PropertyInfo(Variant::INT, "id")));
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "base_type"), "set_base_type", "get_base_type");
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "edited_resource", PROPERTY_HINT_RESOURCE_TYPE, "Resource", 0), "set_edited_resource", "get_edited_resource");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "edited_resource", PROPERTY_HINT_RESOURCE_TYPE, "Resource", PROPERTY_USAGE_NONE), "set_edited_resource", "get_edited_resource");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "editable"), "set_editable", "is_editable");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "toggle_mode"), "set_toggle_mode", "is_toggle_mode");
 
@@ -857,7 +857,7 @@ void EditorScriptPicker::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_script_owner", "owner_node"), &EditorScriptPicker::set_script_owner);
 	ClassDB::bind_method(D_METHOD("get_script_owner"), &EditorScriptPicker::get_script_owner);
 
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "script_owner", PROPERTY_HINT_RESOURCE_TYPE, "Node", 0), "set_script_owner", "get_script_owner");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "script_owner", PROPERTY_HINT_RESOURCE_TYPE, "Node", PROPERTY_USAGE_NONE), "set_script_owner", "get_script_owner");
 }
 
 EditorScriptPicker::EditorScriptPicker() {

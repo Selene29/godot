@@ -51,7 +51,7 @@ protected:
 public:
 	_FORCE_INLINE_ const StringName &get_name() const { return name; }
 	Variant _new();
-	Object *instance();
+	Object *instantiate();
 	GDScriptNativeClass(const StringName &p_name);
 };
 
@@ -80,10 +80,10 @@ class GDScript : public Script {
 	GDScript *_base = nullptr; //fast pointer access
 	GDScript *_owner = nullptr; //for subclasses
 
-	Set<StringName> members; //members are just indices to the instanced script.
+	Set<StringName> members; //members are just indices to the instantiated script.
 	Map<StringName, Variant> constants;
 	Map<StringName, GDScriptFunction *> member_functions;
-	Map<StringName, MemberInfo> member_indices; //members are just indices to the instanced script.
+	Map<StringName, MemberInfo> member_indices; //members are just indices to the instantiated script.
 	Map<StringName, Ref<GDScript>> subclasses;
 	Map<StringName, Vector<StringName>> _signals;
 	Vector<MultiplayerAPI::RPCConfig> rpc_functions;
@@ -196,7 +196,7 @@ public:
 	StringName debug_get_member_by_index(int p_idx) const;
 
 	Variant _new(const Variant **p_args, int p_argcount, Callable::CallError &r_error);
-	virtual bool can_instance() const override;
+	virtual bool can_instantiate() const override;
 
 	virtual Ref<Script> get_base_script() const override;
 
@@ -447,7 +447,7 @@ public:
 	virtual Ref<Script> get_template(const String &p_class_name, const String &p_base_class_name) const;
 	virtual bool is_using_templates();
 	virtual void make_template(const String &p_class_name, const String &p_base_class_name, Ref<Script> &p_script);
-	virtual bool validate(const String &p_script, int &r_line_error, int &r_col_error, String &r_test_error, const String &p_path = "", List<String> *r_functions = nullptr, List<ScriptLanguage::Warning> *r_warnings = nullptr, Set<int> *r_safe_lines = nullptr) const;
+	virtual bool validate(const String &p_script, const String &p_path = "", List<String> *r_functions = nullptr, List<ScriptLanguage::ScriptError> *r_errors = nullptr, List<ScriptLanguage::Warning> *r_warnings = nullptr, Set<int> *r_safe_lines = nullptr) const;
 	virtual Script *create_script() const;
 	virtual bool has_named_classes() const;
 	virtual bool supports_builtin_mode() const;

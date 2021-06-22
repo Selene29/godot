@@ -930,7 +930,7 @@ void CodeTextEditor::update_editor_settings() {
 	text_editor->set_highlight_current_line(EditorSettings::get_singleton()->get("text_editor/highlighting/highlight_current_line"));
 	text_editor->set_indent_using_spaces(EditorSettings::get_singleton()->get("text_editor/indent/type"));
 	text_editor->set_indent_size(EditorSettings::get_singleton()->get("text_editor/indent/size"));
-	text_editor->set_auto_indent(EditorSettings::get_singleton()->get("text_editor/indent/auto_indent"));
+	text_editor->set_auto_indent_enabled(EditorSettings::get_singleton()->get("text_editor/indent/auto_indent"));
 	text_editor->set_draw_tabs(EditorSettings::get_singleton()->get("text_editor/indent/draw_tabs"));
 	text_editor->set_draw_spaces(EditorSettings::get_singleton()->get("text_editor/indent/draw_spaces"));
 	text_editor->set_smooth_scroll_enabled(EditorSettings::get_singleton()->get("text_editor/navigation/smooth_scrolling"));
@@ -1255,7 +1255,7 @@ void CodeTextEditor::_delete_line(int p_line) {
 		text_editor->cursor_set_line(1);
 		text_editor->cursor_set_column(0);
 	}
-	text_editor->backspace_at_cursor();
+	text_editor->backspace();
 	text_editor->unfold_line(p_line);
 	text_editor->cursor_set_line(p_line);
 }
@@ -1612,15 +1612,19 @@ void CodeTextEditor::validate_script() {
 	idle->start();
 }
 
-void CodeTextEditor::_warning_label_gui_input(const Ref<InputEvent> &p_event) {
-	Ref<InputEventMouseButton> mb = p_event;
-	if (mb.is_valid() && mb->is_pressed() && mb->get_button_index() == MOUSE_BUTTON_LEFT) {
-		_warning_button_pressed();
-	}
+void CodeTextEditor::_error_button_pressed() {
+	_set_show_errors_panel(!is_errors_panel_opened);
+	_set_show_warnings_panel(false);
 }
 
 void CodeTextEditor::_warning_button_pressed() {
 	_set_show_warnings_panel(!is_warnings_panel_opened);
+	_set_show_errors_panel(false);
+}
+
+void CodeTextEditor::_set_show_errors_panel(bool p_show) {
+	is_errors_panel_opened = p_show;
+	emit_signal("show_errors_panel", p_show);
 }
 
 void CodeTextEditor::_set_show_warnings_panel(bool p_show) {
@@ -1653,6 +1657,7 @@ void CodeTextEditor::_notification(int p_what) {
 			_update_font();
 		} break;
 		case NOTIFICATION_ENTER_TREE: {
+			error_button->set_icon(get_theme_icon("StatusError", "EditorIcons"));
 			warning_button->set_icon(get_theme_icon("NodeWarning", "EditorIcons"));
 			add_theme_constant_override("separation", 4 * EDSCALE);
 		} break;
@@ -1667,11 +1672,18 @@ void CodeTextEditor::_notification(int p_what) {
 	}
 }
 
-void CodeTextEditor::set_warning_nb(int p_warning_nb) {
-	warning_count_label->set_text(itos(p_warning_nb));
-	warning_count_label->set_visible(p_warning_nb > 0);
-	warning_button->set_visible(p_warning_nb > 0);
-	if (!p_warning_nb) {
+void CodeTextEditor::set_error_count(int p_error_count) {
+	error_button->set_text(itos(p_error_count));
+	error_button->set_visible(p_error_count > 0);
+	if (!p_error_count) {
+		_set_show_errors_panel(false);
+	}
+}
+
+void CodeTextEditor::set_warning_count(int p_warning_count) {
+	warning_button->set_text(itos(p_warning_count));
+	warning_button->set_visible(p_warning_count > 0);
+	if (!p_warning_count) {
 		_set_show_warnings_panel(false);
 	}
 }
@@ -1738,6 +1750,7 @@ void CodeTextEditor::_bind_methods() {
 
 	ADD_SIGNAL(MethodInfo("validate_script"));
 	ADD_SIGNAL(MethodInfo("load_theme_settings"));
+	ADD_SIGNAL(MethodInfo("show_errors_panel"));
 	ADD_SIGNAL(MethodInfo("show_warnings_panel"));
 }
 
@@ -1796,7 +1809,7 @@ CodeTextEditor::CodeTextEditor() {
 
 	text_editor->set_draw_line_numbers(true);
 	text_editor->set_brace_matching(true);
-	text_editor->set_auto_indent(true);
+	text_editor->set_auto_indent_enabled(true);
 
 	status_bar = memnew(HBoxContainer);
 	add_child(status_bar);
@@ -1835,6 +1848,22 @@ CodeTextEditor::CodeTextEditor() {
 	error->set_mouse_filter(MOUSE_FILTER_STOP);
 	error->connect("gui_input", callable_mp(this, &CodeTextEditor::_error_pressed));
 
+	// Errors
+	error_button = memnew(Button);
+	error_button->set_flat(true);
+	status_bar->add_child(error_button);
+	error_button->set_v_size_flags(SIZE_EXPAND | SIZE_SHRINK_CENTER);
+	error_button->set_default_cursor_shape(CURSOR_POINTING_HAND);
+	error_button->connect("pressed", callable_mp(this, &CodeTextEditor::_error_button_pressed));
+	error_button->set_tooltip(TTR("Errors"));
+
+	error_button->add_theme_color_override("font_color", EditorNode::get_singleton()->get_gui_base()->get_theme_color("error_color", "Editor"));
+	error_button->add_theme_font_override("font", EditorNode::get_singleton()->get_gui_base()->get_theme_font("status_source", "EditorFonts"));
+	error_button->add_theme_font_size_override("font_size", EditorNode::get_singleton()->get_gui_base()->get_theme_font_size("status_source_size", "EditorFonts"));
+
+	is_errors_panel_opened = false;
+	set_error_count(0);
+
 	// Warnings
 	warning_button = memnew(Button);
 	warning_button->set_flat(true);
@@ -1844,20 +1873,12 @@ CodeTextEditor::CodeTextEditor() {
 	warning_button->connect("pressed", callable_mp(this, &CodeTextEditor::_warning_button_pressed));
 	warning_button->set_tooltip(TTR("Warnings"));
 
-	warning_count_label = memnew(Label);
-	status_bar->add_child(warning_count_label);
-	warning_count_label->set_v_size_flags(SIZE_EXPAND | SIZE_SHRINK_CENTER);
-	warning_count_label->set_align(Label::ALIGN_RIGHT);
-	warning_count_label->set_default_cursor_shape(CURSOR_POINTING_HAND);
-	warning_count_label->set_mouse_filter(MOUSE_FILTER_STOP);
-	warning_count_label->set_tooltip(TTR("Warnings"));
-	warning_count_label->add_theme_color_override("font_color", EditorNode::get_singleton()->get_gui_base()->get_theme_color("warning_color", "Editor"));
-	warning_count_label->add_theme_font_override("font", EditorNode::get_singleton()->get_gui_base()->get_theme_font("status_source", "EditorFonts"));
-	warning_count_label->add_theme_font_size_override("font_size", EditorNode::get_singleton()->get_gui_base()->get_theme_font_size("status_source_size", "EditorFonts"));
-	warning_count_label->connect("gui_input", callable_mp(this, &CodeTextEditor::_warning_label_gui_input));
+	warning_button->add_theme_color_override("font_color", EditorNode::get_singleton()->get_gui_base()->get_theme_color("warning_color", "Editor"));
+	warning_button->add_theme_font_override("font", EditorNode::get_singleton()->get_gui_base()->get_theme_font("status_source", "EditorFonts"));
+	warning_button->add_theme_font_size_override("font_size", EditorNode::get_singleton()->get_gui_base()->get_theme_font_size("status_source_size", "EditorFonts"));
 
 	is_warnings_panel_opened = false;
-	set_warning_nb(0);
+	set_warning_count(0);
 
 	// Line and column
 	line_and_col_txt = memnew(Label);

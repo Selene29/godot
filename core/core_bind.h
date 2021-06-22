@@ -230,6 +230,9 @@ public:
 
 	String get_user_data_dir() const;
 	String get_external_data_dir() const;
+	String get_config_dir() const;
+	String get_data_dir() const;
+	String get_cache_dir() const;
 
 	Error set_thread_name(const String &p_name);
 	Thread::ID get_thread_caller_id() const;
@@ -582,8 +585,8 @@ public:
 	StringName get_parent_class(const StringName &p_class) const;
 	bool class_exists(const StringName &p_class) const;
 	bool is_parent_class(const StringName &p_class, const StringName &p_inherits) const;
-	bool can_instance(const StringName &p_class) const;
-	Variant instance(const StringName &p_class) const;
+	bool can_instantiate(const StringName &p_class) const;
+	Variant instantiate(const StringName &p_class) const;
 
 	bool has_signal(StringName p_class, StringName p_signal) const;
 	Dictionary get_signal(StringName p_class, StringName p_signal) const;
@@ -653,55 +656,10 @@ public:
 	void set_editor_hint(bool p_enabled);
 	bool is_editor_hint() const;
 
+	void set_print_error_messages(bool p_enabled);
+	bool is_printing_error_messages() const;
+
 	_Engine() { singleton = this; }
-};
-
-class _JSON;
-
-class JSONParseResult : public RefCounted {
-	GDCLASS(JSONParseResult, RefCounted);
-
-	friend class _JSON;
-
-	Error error;
-	String error_string;
-	int error_line = -1;
-
-	Variant result;
-
-protected:
-	static void _bind_methods();
-
-public:
-	void set_error(Error p_error);
-	Error get_error() const;
-
-	void set_error_string(const String &p_error_string);
-	String get_error_string() const;
-
-	void set_error_line(int p_error_line);
-	int get_error_line() const;
-
-	void set_result(const Variant &p_result);
-	Variant get_result() const;
-
-	JSONParseResult() {}
-};
-
-class _JSON : public Object {
-	GDCLASS(_JSON, Object);
-
-protected:
-	static void _bind_methods();
-	static _JSON *singleton;
-
-public:
-	static _JSON *get_singleton() { return singleton; }
-
-	String print(const Variant &p_value, const String &p_indent = "", bool p_sort_keys = false, bool p_full_precision = false);
-	Ref<JSONParseResult> parse(const String &p_json);
-
-	_JSON() { singleton = this; }
 };
 
 class _EngineDebugger : public Object {

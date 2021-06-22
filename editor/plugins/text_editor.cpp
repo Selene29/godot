@@ -320,10 +320,10 @@ void TextEditor::_edit_option(int p_op) {
 			code_editor->move_lines_down();
 		} break;
 		case EDIT_INDENT_LEFT: {
-			tx->indent_selected_lines_left();
+			tx->unindent_lines();
 		} break;
 		case EDIT_INDENT_RIGHT: {
-			tx->indent_selected_lines_right();
+			tx->indent_lines();
 		} break;
 		case EDIT_DELETE_LINE: {
 			code_editor->delete_lines();
@@ -581,11 +581,11 @@ TextEditor::TextEditor() {
 	highlighter_menu->connect("id_pressed", callable_mp(this, &TextEditor::_change_syntax_highlighter));
 
 	Ref<EditorPlainTextSyntaxHighlighter> plain_highlighter;
-	plain_highlighter.instance();
+	plain_highlighter.instantiate();
 	add_syntax_highlighter(plain_highlighter);
 
 	Ref<EditorStandardSyntaxHighlighter> highlighter;
-	highlighter.instance();
+	highlighter.instantiate();
 	add_syntax_highlighter(highlighter);
 	set_syntax_highlighter(plain_highlighter);
 

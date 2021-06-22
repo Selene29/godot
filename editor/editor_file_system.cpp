@@ -1475,8 +1475,6 @@ void EditorFileSystem::update_file(const String &p_file) {
 
 	if (cpos == -1) {
 		// The file did not exist, it was added.
-
-		late_added_files.insert(p_file); // Remember that it was added. This mean it will be scanned and imported on editor restart.
 		int idx = 0;
 		String file_name = p_file.get_file();
 
@@ -1526,7 +1524,7 @@ Error EditorFileSystem::_reimport_group(const String &p_group_file, const Vector
 	Map<String, String> base_paths;
 	for (int i = 0; i < p_files.size(); i++) {
 		Ref<ConfigFile> config;
-		config.instance();
+		config.instantiate();
 		Error err = config->load(p_files[i] + ".import");
 		ERR_CONTINUE(err != OK);
 		ERR_CONTINUE(!config->has_section_key("remap", "importer"));
@@ -1708,7 +1706,7 @@ void EditorFileSystem::_reimport_file(const String &p_file, const Map<StringName
 		//use existing
 		if (p_custom_options == nullptr) {
 			Ref<ConfigFile> cf;
-			cf.instance();
+			cf.instantiate();
 			Error err = cf->load(p_file + ".import");
 			if (err == OK) {
 				if (cf->has_section("params")) {
@@ -1723,9 +1721,6 @@ void EditorFileSystem::_reimport_file(const String &p_file, const Map<StringName
 				}
 			}
 		}
-
-	} else {
-		late_added_files.insert(p_file); //imported files do not call update_file(), but just in case..
 	}
 
 	if (importer_name == "keep") {
@@ -2073,7 +2068,7 @@ void EditorFileSystem::_move_group_files(EditorFileSystemDirectory *efd, const S
 			files[i]->import_group_file = p_new_location;
 
 			Ref<ConfigFile> config;
-			config.instance();
+			config.instantiate();
 			String path = efd->get_file_path(i) + ".import";
 			Error err = config->load(path);
 			if (err != OK) {

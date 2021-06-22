@@ -240,7 +240,7 @@ void ShaderTextEditor::_validate_script() {
 		warnings.sort_custom<WarningsComparator>();
 		_update_warning_panel();
 	} else {
-		set_warning_nb(0);
+		set_warning_count(0);
 	}
 	emit_signal("script_changed");
 }
@@ -280,14 +280,14 @@ void ShaderTextEditor::_update_warning_panel() {
 	}
 	warnings_panel->pop(); // Table.
 
-	set_warning_nb(warning_count);
+	set_warning_count(warning_count);
 }
 
 void ShaderTextEditor::_bind_methods() {
 }
 
 ShaderTextEditor::ShaderTextEditor() {
-	syntax_highlighter.instance();
+	syntax_highlighter.instantiate();
 	get_text_editor()->set_syntax_highlighter(syntax_highlighter);
 }
 
@@ -323,19 +323,13 @@ void ShaderEditor::_menu_option(int p_option) {
 			if (shader.is_null()) {
 				return;
 			}
-
-			CodeEdit *tx = shader_editor->get_text_editor();
-			tx->indent_selected_lines_left();
-
+			shader_editor->get_text_editor()->unindent_lines();
 		} break;
 		case EDIT_INDENT_RIGHT: {
 			if (shader.is_null()) {
 				return;
 			}
-
-			CodeEdit *tx = shader_editor->get_text_editor();
-			tx->indent_selected_lines_right();
-
+			shader_editor->get_text_editor()->indent_lines();
 		} break;
 		case EDIT_DELETE_LINE: {
 			shader_editor->delete_lines();
