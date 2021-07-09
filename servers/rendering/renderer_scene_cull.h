@@ -97,7 +97,7 @@ public:
 		}
 	};
 
-	mutable RID_PtrOwner<Camera, true> camera_owner;
+	mutable RID_Owner<Camera, true> camera_owner;
 
 	virtual RID camera_allocate();
 	virtual void camera_initialize(RID p_rid);
@@ -315,7 +315,6 @@ public:
 
 		DynamicBVH indexers[INDEXER_MAX];
 
-		RS::ScenarioDebugMode debug;
 		RID self;
 
 		List<Instance *> directional_lights;
@@ -338,14 +337,13 @@ public:
 		Scenario() {
 			indexers[INDEXER_GEOMETRY].set_index(INDEXER_GEOMETRY);
 			indexers[INDEXER_VOLUMES].set_index(INDEXER_VOLUMES);
-			debug = RS::SCENARIO_DEBUG_DISABLED;
 			used_viewport_visibility_bits = 0;
 		}
 	};
 
 	int indexer_update_iterations = 0;
 
-	mutable RID_PtrOwner<Scenario, true> scenario_owner;
+	mutable RID_Owner<Scenario, true> scenario_owner;
 
 	static void _instance_pair(Instance *p_A, Instance *p_B);
 	static void _instance_unpair(Instance *p_A, Instance *p_B);
@@ -355,7 +353,6 @@ public:
 	virtual RID scenario_allocate();
 	virtual void scenario_initialize(RID p_rid);
 
-	virtual void scenario_set_debug(RID p_scenario, RS::ScenarioDebugMode p_debug_mode);
 	virtual void scenario_set_environment(RID p_scenario, RID p_environment);
 	virtual void scenario_set_camera_effects(RID p_scenario, RID p_fx);
 	virtual void scenario_set_fallback_environment(RID p_scenario, RID p_environment);
@@ -895,7 +892,7 @@ public:
 
 	uint32_t thread_cull_threshold = 200;
 
-	RID_PtrOwner<Instance, true> instance_owner;
+	RID_Owner<Instance, true> instance_owner;
 
 	uint32_t geometry_instance_pair_mask; // used in traditional forward, unnecessary on clustered
 
@@ -914,7 +911,6 @@ public:
 	virtual void instance_set_custom_aabb(RID p_instance, AABB p_aabb);
 
 	virtual void instance_attach_skeleton(RID p_instance, RID p_skeleton);
-	virtual void instance_set_exterior(RID p_instance, bool p_enabled);
 
 	virtual void instance_set_extra_visibility_margin(RID p_instance, real_t p_margin);
 
@@ -1023,10 +1019,10 @@ public:
 	void _scene_cull(CullData &cull_data, InstanceCullResult &cull_result, uint64_t p_from, uint64_t p_to);
 
 	bool _render_reflection_probe_step(Instance *p_instance, int p_step);
-	void _render_scene(const RendererSceneRender::CameraData *p_camera_data, RID p_render_buffers, RID p_environment, RID p_force_camera_effects, uint32_t p_visible_layers, RID p_scenario, RID p_viewport, RID p_shadow_atlas, RID p_reflection_probe, int p_reflection_probe_pass, float p_screen_lod_threshold, bool p_using_shadows = true);
+	void _render_scene(const RendererSceneRender::CameraData *p_camera_data, RID p_render_buffers, RID p_environment, RID p_force_camera_effects, uint32_t p_visible_layers, RID p_scenario, RID p_viewport, RID p_shadow_atlas, RID p_reflection_probe, int p_reflection_probe_pass, float p_screen_lod_threshold, bool p_using_shadows = true, RenderInfo *r_render_info = nullptr);
 	void render_empty_scene(RID p_render_buffers, RID p_scenario, RID p_shadow_atlas);
 
-	void render_camera(RID p_render_buffers, RID p_camera, RID p_scenario, RID p_viewport, Size2 p_viewport_size, float p_screen_lod_threshold, RID p_shadow_atlas, Ref<XRInterface> &p_xr_interface);
+	void render_camera(RID p_render_buffers, RID p_camera, RID p_scenario, RID p_viewport, Size2 p_viewport_size, float p_screen_lod_threshold, RID p_shadow_atlas, Ref<XRInterface> &p_xr_interface, RendererScene::RenderInfo *r_render_info = nullptr);
 	void update_dirty_instances();
 
 	void render_particle_colliders();

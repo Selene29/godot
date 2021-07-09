@@ -212,14 +212,19 @@ EditorPluginSettings::EditorPluginSettings() {
 	plugin_list->set_column_title(3, TTR("Status:"));
 	plugin_list->set_column_title(4, TTR("Edit:"));
 	plugin_list->set_column_expand(0, true);
+	plugin_list->set_column_clip_content(0, true);
 	plugin_list->set_column_expand(1, false);
+	plugin_list->set_column_clip_content(1, true);
 	plugin_list->set_column_expand(2, false);
+	plugin_list->set_column_clip_content(2, true);
 	plugin_list->set_column_expand(3, false);
+	plugin_list->set_column_clip_content(3, true);
 	plugin_list->set_column_expand(4, false);
-	plugin_list->set_column_min_width(1, 100 * EDSCALE);
-	plugin_list->set_column_min_width(2, 250 * EDSCALE);
-	plugin_list->set_column_min_width(3, 80 * EDSCALE);
-	plugin_list->set_column_min_width(4, 40 * EDSCALE);
+	plugin_list->set_column_clip_content(4, true);
+	plugin_list->set_column_custom_minimum_width(1, 100 * EDSCALE);
+	plugin_list->set_column_custom_minimum_width(2, 250 * EDSCALE);
+	plugin_list->set_column_custom_minimum_width(3, 80 * EDSCALE);
+	plugin_list->set_column_custom_minimum_width(4, 40 * EDSCALE);
 	plugin_list->set_hide_root(true);
 	plugin_list->connect("item_edited", callable_mp(this, &EditorPluginSettings::_plugin_activity_changed));
 

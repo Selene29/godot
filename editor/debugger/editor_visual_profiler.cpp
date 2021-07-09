@@ -309,7 +309,7 @@ void EditorVisualProfiler::_update_plot() {
 		graph_texture->create_from_image(img);
 	}
 
-	graph_texture->update(img, true);
+	graph_texture->update(img);
 
 	graph->set_texture(graph_texture);
 	graph->update();
@@ -773,13 +773,16 @@ EditorVisualProfiler::EditorVisualProfiler() {
 	variables->set_column_titles_visible(true);
 	variables->set_column_title(0, TTR("Name"));
 	variables->set_column_expand(0, true);
-	variables->set_column_min_width(0, 60);
+	variables->set_column_clip_content(0, true);
+	variables->set_column_custom_minimum_width(0, 60);
 	variables->set_column_title(1, TTR("CPU"));
 	variables->set_column_expand(1, false);
-	variables->set_column_min_width(1, 60 * EDSCALE);
+	variables->set_column_clip_content(1, true);
+	variables->set_column_custom_minimum_width(1, 60 * EDSCALE);
 	variables->set_column_title(2, TTR("GPU"));
 	variables->set_column_expand(2, false);
-	variables->set_column_min_width(2, 60 * EDSCALE);
+	variables->set_column_clip_content(2, true);
+	variables->set_column_custom_minimum_width(2, 60 * EDSCALE);
 	variables->connect("cell_selected", callable_mp(this, &EditorVisualProfiler::_item_selected));
 
 	graph = memnew(TextureRect);

@@ -32,6 +32,7 @@
 
 #include "core/config/project_settings.h"
 #include "core/core_bind.h"
+#include "core/extension/native_extension_manager.h"
 #include "core/input/input.h"
 #include "core/io/config_file.h"
 #include "core/io/file_access.h"
@@ -136,6 +137,7 @@
 #include "editor/plugins/gpu_particles_3d_editor_plugin.h"
 #include "editor/plugins/gpu_particles_collision_sdf_editor_plugin.h"
 #include "editor/plugins/gradient_editor_plugin.h"
+#include "editor/plugins/input_event_editor_plugin.h"
 #include "editor/plugins/item_list_editor_plugin.h"
 #include "editor/plugins/light_occluder_2d_editor_plugin.h"
 #include "editor/plugins/lightmap_gi_editor_plugin.h"
@@ -590,8 +592,7 @@ void EditorNode::_notification(int p_what) {
 				_initializing_addons = false;
 			}
 
-			RenderingServer::get_singleton()->viewport_set_hide_scenario(get_scene_root()->get_viewport_rid(), true);
-			RenderingServer::get_singleton()->viewport_set_hide_canvas(get_scene_root()->get_viewport_rid(), true);
+			RenderingServer::get_singleton()->viewport_set_disable_2d(get_scene_root()->get_viewport_rid(), true);
 			RenderingServer::get_singleton()->viewport_set_disable_environment(get_viewport()->get_viewport_rid(), true);
 
 			feature_profile_manager->notify_changed();
@@ -708,6 +709,7 @@ void EditorNode::_notification(int p_what) {
 			p->set_item_icon(p->get_item_index(HELP_DOCS), gui_base->get_theme_icon("Instance", "EditorIcons"));
 			p->set_item_icon(p->get_item_index(HELP_QA), gui_base->get_theme_icon("Instance", "EditorIcons"));
 			p->set_item_icon(p->get_item_index(HELP_REPORT_A_BUG), gui_base->get_theme_icon("Instance", "EditorIcons"));
+			p->set_item_icon(p->get_item_index(HELP_SUGGEST_A_FEATURE), gui_base->get_theme_icon("Instance", "EditorIcons"));
 			p->set_item_icon(p->get_item_index(HELP_SEND_DOCS_FEEDBACK), gui_base->get_theme_icon("Instance", "EditorIcons"));
 			p->set_item_icon(p->get_item_index(HELP_COMMUNITY), gui_base->get_theme_icon("Instance", "EditorIcons"));
 			p->set_item_icon(p->get_item_index(HELP_ABOUT), gui_base->get_theme_icon("Godot", "EditorIcons"));
@@ -2795,6 +2797,9 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 		case HELP_REPORT_A_BUG: {
 			OS::get_singleton()->shell_open("https://github.com/godotengine/godot/issues");
 		} break;
+		case HELP_SUGGEST_A_FEATURE: {
+			OS::get_singleton()->shell_open("https://github.com/godotengine/godot-proposals#readme");
+		} break;
 		case HELP_SEND_DOCS_FEEDBACK: {
 			OS::get_singleton()->shell_open("https://github.com/godotengine/godot-docs/issues");
 		} break;
@@ -3771,9 +3776,12 @@ void EditorNode::register_editor_types() {
 	ClassDB::register_class<EditorScenePostImport>();
 	//ClassDB::register_type<EditorImportExport>();
 	ClassDB::register_class<EditorDebuggerPlugin>();
+
+	NativeExtensionManager::get_singleton()->initialize_extensions(NativeExtension::INITIALIZATION_LEVEL_EDITOR);
 }
 
 void EditorNode::unregister_editor_types() {
+	NativeExtensionManager::get_singleton()->deinitialize_extensions(NativeExtension::INITIALIZATION_LEVEL_EDITOR);
 	_init_callbacks.clear();
 	if (EditorPaths::get_singleton()) {
 		EditorPaths::free();
@@ -3865,6 +3873,21 @@ Ref<ImageTexture> EditorNode::_load_custom_class_icon(const String &p_path) cons
 		}
 	}
 	return nullptr;
+}
+
+void EditorNode::_pick_main_scene_custom_action(const String &p_custom_action_name) {
+	if (p_custom_action_name == "select_current") {
+		Node *scene = editor_data.get_edited_scene_root();
+
+		if (!scene) {
+			show_accept(TTR("There is no defined scene to run."), TTR("OK"));
+			return;
+		}
+
+		pick_main_scene->hide();
+		current_option = SETTINGS_PICK_MAIN_SCENE;
+		_dialog_action(scene->get_filename());
+	}
 }
 
 Ref<Texture2D> EditorNode::get_object_icon(const Object *p_object, const String &p_fallback) const {
@@ -4661,6 +4684,14 @@ bool EditorNode::ensure_main_scene(bool p_from_native) {
 		current_option = -1;
 		pick_main_scene->set_text(TTR("No main scene has ever been defined, select one?\nYou can change it later in \"Project Settings\" under the 'application' category."));
 		pick_main_scene->popup_centered();
+
+		if (editor_data.get_edited_scene_root()) {
+			select_current_scene_button->set_disabled(false);
+			select_current_scene_button->grab_focus();
+		} else {
+			select_current_scene_button->set_disabled(true);
+		}
+
 		return false;
 	}
 
@@ -6108,9 +6139,9 @@ EditorNode::EditorNode() {
 	scene_root_parent->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 
 	scene_root = memnew(SubViewport);
-	//scene_root->set_usage(Viewport::USAGE_2D); canvas BG mode prevents usage of this as 2D
+	scene_root->set_embed_subwindows_hint(true);
+	scene_root->set_disable_3d(true);
 
-	RenderingServer::get_singleton()->viewport_set_hide_scenario(scene_root->get_viewport_rid(), true);
 	scene_root->set_disable_input(true);
 	scene_root->set_as_audio_listener_2d(true);
 
@@ -6357,6 +6388,7 @@ EditorNode::EditorNode() {
 	p->add_icon_shortcut(gui_base->get_theme_icon("Instance", "EditorIcons"), ED_SHORTCUT("editor/online_docs", TTR("Online Documentation")), HELP_DOCS);
 	p->add_icon_shortcut(gui_base->get_theme_icon("Instance", "EditorIcons"), ED_SHORTCUT("editor/q&a", TTR("Questions & Answers")), HELP_QA);
 	p->add_icon_shortcut(gui_base->get_theme_icon("Instance", "EditorIcons"), ED_SHORTCUT("editor/report_a_bug", TTR("Report a Bug")), HELP_REPORT_A_BUG);
+	p->add_icon_shortcut(gui_base->get_theme_icon("Instance", "EditorIcons"), ED_SHORTCUT("editor/suggest_a_feature", TTR("Suggest a Feature")), HELP_SUGGEST_A_FEATURE);
 	p->add_icon_shortcut(gui_base->get_theme_icon("Instance", "EditorIcons"), ED_SHORTCUT("editor/send_docs_feedback", TTR("Send Docs Feedback")), HELP_SEND_DOCS_FEEDBACK);
 	p->add_icon_shortcut(gui_base->get_theme_icon("Instance", "EditorIcons"), ED_SHORTCUT("editor/community", TTR("Community")), HELP_COMMUNITY);
 	p->add_separator();
@@ -6808,6 +6840,7 @@ EditorNode::EditorNode() {
 	add_editor_plugin(memnew(MeshEditorPlugin(this)));
 	add_editor_plugin(memnew(MaterialEditorPlugin(this)));
 	add_editor_plugin(memnew(GPUParticlesCollisionSDFEditorPlugin(this)));
+	add_editor_plugin(memnew(InputEventEditorPlugin(this)));
 
 	for (int i = 0; i < EditorPlugins::get_plugin_count(); i++) {
 		add_editor_plugin(EditorPlugins::create(i, this));
@@ -6936,6 +6969,8 @@ EditorNode::EditorNode() {
 	gui_base->add_child(pick_main_scene);
 	pick_main_scene->get_ok_button()->set_text(TTR("Select"));
 	pick_main_scene->connect("confirmed", callable_mp(this, &EditorNode::_menu_option), varray(SETTINGS_PICK_MAIN_SCENE));
+	select_current_scene_button = pick_main_scene->add_button(TTR("Select Current"), true, "select_current");
+	pick_main_scene->connect("custom_action", callable_mp(this, &EditorNode::_pick_main_scene_custom_action));
 
 	for (int i = 0; i < _init_callbacks.size(); i++) {
 		_init_callbacks[i]();

@@ -36,6 +36,7 @@
 #include "core/templates/self_list.h"
 #include "scene/resources/mesh.h"
 #include "servers/rendering/renderer_compositor.h"
+#include "servers/rendering/renderer_scene_render.h"
 #include "servers/rendering_server.h"
 
 class RasterizerSceneDummy : public RendererSceneRender {
@@ -175,7 +176,7 @@ public:
 
 	void voxel_gi_set_quality(RS::VoxelGIQuality) override {}
 
-	void render_scene(RID p_render_buffers, const CameraData *p_camera_data, const PagedArray<GeometryInstance *> &p_instances, const PagedArray<RID> &p_lights, const PagedArray<RID> &p_reflection_probes, const PagedArray<RID> &p_voxel_gi_instances, const PagedArray<RID> &p_decals, const PagedArray<RID> &p_lightmaps, RID p_environment, RID p_camera_effects, RID p_shadow_atlas, RID p_occluder_debug_tex, RID p_reflection_atlas, RID p_reflection_probe, int p_reflection_probe_pass, float p_screen_lod_threshold, const RenderShadowData *p_render_shadows, int p_render_shadow_count, const RenderSDFGIData *p_render_sdfgi_regions, int p_render_sdfgi_region_count, const RenderSDFGIUpdateData *p_sdfgi_update_data = nullptr) override {}
+	void render_scene(RID p_render_buffers, const CameraData *p_camera_data, const PagedArray<GeometryInstance *> &p_instances, const PagedArray<RID> &p_lights, const PagedArray<RID> &p_reflection_probes, const PagedArray<RID> &p_voxel_gi_instances, const PagedArray<RID> &p_decals, const PagedArray<RID> &p_lightmaps, RID p_environment, RID p_camera_effects, RID p_shadow_atlas, RID p_occluder_debug_tex, RID p_reflection_atlas, RID p_reflection_probe, int p_reflection_probe_pass, float p_screen_lod_threshold, const RenderShadowData *p_render_shadows, int p_render_shadow_count, const RenderSDFGIData *p_render_sdfgi_regions, int p_render_sdfgi_region_count, const RenderSDFGIUpdateData *p_sdfgi_update_data = nullptr, RendererScene::RenderInfo *r_info = nullptr) override {}
 	void render_material(const Transform3D &p_cam_transform, const CameraMatrix &p_cam_projection, bool p_cam_ortogonal, const PagedArray<GeometryInstance *> &p_instances, RID p_framebuffer, const Rect2i &p_region) override {}
 	void render_particle_collider_heightfield(RID p_collider, const Transform3D &p_transform, const PagedArray<GeometryInstance *> &p_instances) override {}
 
@@ -225,7 +226,6 @@ public:
 	}
 
 	void texture_2d_layered_initialize(RID p_texture, const Vector<Ref<Image>> &p_layers, RS::TextureLayeredType p_layered_type) override {}
-	void texture_2d_update_immediate(RID p_texture, const Ref<Image> &p_image, int p_layer = 0) override {}
 	void texture_2d_update(RID p_texture, const Ref<Image> &p_image, int p_layer = 0) override {}
 	void texture_3d_initialize(RID p_texture, Image::Format, int p_width, int p_height, int p_depth, bool p_mipmaps, const Vector<Ref<Image>> &p_data) override {}
 	void texture_3d_update(RID p_texture, const Vector<Ref<Image>> &p_data) override {}
@@ -324,7 +324,9 @@ public:
 	void mesh_set_blend_shape_mode(RID p_mesh, RS::BlendShapeMode p_mode) override {}
 	RS::BlendShapeMode mesh_get_blend_shape_mode(RID p_mesh) const override { return RS::BLEND_SHAPE_MODE_NORMALIZED; }
 
-	void mesh_surface_update_region(RID p_mesh, int p_surface, int p_offset, const Vector<uint8_t> &p_data) override {}
+	void mesh_surface_update_vertex_region(RID p_mesh, int p_surface, int p_offset, const Vector<uint8_t> &p_data) override {}
+	void mesh_surface_update_attribute_region(RID p_mesh, int p_surface, int p_offset, const Vector<uint8_t> &p_data) override {}
+	void mesh_surface_update_skin_region(RID p_mesh, int p_surface, int p_offset, const Vector<uint8_t> &p_data) override {}
 
 	void mesh_surface_set_material(RID p_mesh, int p_surface, RID p_material) override {}
 	RID mesh_surface_get_material(RID p_mesh, int p_surface) const override { return RID(); }
@@ -365,23 +367,6 @@ public:
 	void multimesh_set_visible_instances(RID p_multimesh, int p_visible) override {}
 	int multimesh_get_visible_instances(RID p_multimesh) const override { return 0; }
 
-	/* IMMEDIATE API */
-
-	RID immediate_allocate() override { return RID(); }
-	void immediate_initialize(RID p_rid) override {}
-	void immediate_begin(RID p_immediate, RS::PrimitiveType p_rimitive, RID p_texture = RID()) override {}
-	void immediate_vertex(RID p_immediate, const Vector3 &p_vertex) override {}
-	void immediate_normal(RID p_immediate, const Vector3 &p_normal) override {}
-	void immediate_tangent(RID p_immediate, const Plane &p_tangent) override {}
-	void immediate_color(RID p_immediate, const Color &p_color) override {}
-	void immediate_uv(RID p_immediate, const Vector2 &tex_uv) override {}
-	void immediate_uv2(RID p_immediate, const Vector2 &tex_uv) override {}
-	void immediate_end(RID p_immediate) override {}
-	void immediate_clear(RID p_immediate) override {}
-	void immediate_set_material(RID p_immediate, RID p_material) override {}
-	RID immediate_get_material(RID p_immediate) const override { return RID(); }
-	AABB immediate_get_aabb(RID p_immediate) const override { return AABB(); }
-
 	/* SKELETON API */
 
 	RID skeleton_allocate() override { return RID(); }
@@ -421,10 +406,8 @@ public:
 	void light_directional_set_shadow_mode(RID p_light, RS::LightDirectionalShadowMode p_mode) override {}
 	void light_directional_set_blend_splits(RID p_light, bool p_enable) override {}
 	bool light_directional_get_blend_splits(RID p_light) const override { return false; }
-	void light_directional_set_shadow_depth_range_mode(RID p_light, RS::LightDirectionalShadowDepthRangeMode p_range_mode) override {}
 	void light_directional_set_sky_only(RID p_light, bool p_sky_only) override {}
 	bool light_directional_is_sky_only(RID p_light) const override { return false; }
-	RS::LightDirectionalShadowDepthRangeMode light_directional_get_shadow_depth_range_mode(RID p_light) const override { return RS::LIGHT_DIRECTIONAL_SHADOW_DEPTH_RANGE_STABLE; }
 
 	RS::LightDirectionalShadowMode light_directional_get_shadow_mode(RID p_light) override { return RS::LIGHT_DIRECTIONAL_SHADOW_ORTHOGONAL; }
 	RS::LightOmniShadowMode light_omni_get_shadow_mode(RID p_light) override { return RS::LIGHT_OMNI_SHADOW_DUAL_PARABOLOID; }
@@ -505,12 +488,6 @@ public:
 
 	void voxel_gi_set_energy(RID p_voxel_gi, float p_range) override {}
 	float voxel_gi_get_energy(RID p_voxel_gi) const override { return 0.0; }
-
-	void voxel_gi_set_ao(RID p_voxel_gi, float p_ao) override {}
-	float voxel_gi_get_ao(RID p_voxel_gi) const override { return 0; }
-
-	void voxel_gi_set_ao_size(RID p_voxel_gi, float p_strength) override {}
-	float voxel_gi_get_ao_size(RID p_voxel_gi) const override { return 0; }
 
 	void voxel_gi_set_bias(RID p_voxel_gi, float p_range) override {}
 	float voxel_gi_get_bias(RID p_voxel_gi) const override { return 0.0; }
@@ -686,17 +663,15 @@ public:
 		return true;
 	}
 
+	virtual void update_memory_info() override {}
+	virtual uint64_t get_rendering_info(RS::RenderingInfo p_info) override { return 0; }
+
 	bool has_os_feature(const String &p_feature) const override { return false; }
 
 	void update_dirty_resources() override {}
 
 	void set_debug_generate_wireframes(bool p_generate) override {}
 
-	void render_info_begin_capture() override {}
-	void render_info_end_capture() override {}
-	int get_captured_render_info(RS::RenderInfo p_info) override { return 0; }
-
-	uint64_t get_render_info(RS::RenderInfo p_info) override { return 0; }
 	String get_video_adapter_name() const override { return String(); }
 	String get_video_adapter_vendor() const override { return String(); }
 
@@ -733,8 +708,6 @@ public:
 	void occluder_polygon_set_shape(RID p_occluder, const Vector<Vector2> &p_points, bool p_closed) override {}
 	void occluder_polygon_set_cull_mode(RID p_occluder, RS::CanvasOccluderPolygonCullMode p_mode) override {}
 	void set_shadow_texture_size(int p_size) override {}
-
-	void draw_window_margins(int *p_margins, RID *p_margin_textures) override {}
 
 	bool free(RID p_rid) override { return true; }
 	void update() override {}

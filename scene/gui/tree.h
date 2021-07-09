@@ -315,16 +315,18 @@ public:
 	void set_disable_folding(bool p_disable);
 	bool is_folding_disabled() const;
 
+	Size2 get_minimum_size(int p_column);
+
 	/* Item manipulation */
 
 	TreeItem *create_child(int p_idx = -1);
 
-	Tree *get_tree();
+	Tree *get_tree() const;
 
 	TreeItem *get_prev();
-	TreeItem *get_next();
-	TreeItem *get_parent();
-	TreeItem *get_first_child();
+	TreeItem *get_next() const;
+	TreeItem *get_parent() const;
+	TreeItem *get_first_child() const;
 
 	TreeItem *get_prev_visible(bool p_wrap = false);
 	TreeItem *get_next_visible(bool p_wrap = false);
@@ -408,8 +410,10 @@ private:
 	int drop_mode_flags = 0;
 
 	struct ColumnInfo {
-		int min_width = 1;
+		int custom_min_width = 0;
+		int expand_ratio = 1;
 		bool expand = true;
+		bool clip_content = false;
 		String title;
 		Ref<TextLine> text_buf;
 		Dictionary opentype_features;
@@ -448,7 +452,7 @@ private:
 	void draw_item_rect(TreeItem::Cell &p_cell, const Rect2i &p_rect, const Color &p_color, const Color &p_icon_color, int p_ol_size, const Color &p_ol_color);
 	int draw_item(const Point2i &p_pos, const Point2 &p_draw_ofs, const Size2 &p_draw_size, TreeItem *p_item);
 	void select_single_item(TreeItem *p_selected, TreeItem *p_current, int p_col, TreeItem *p_prev = nullptr, bool *r_in_range = nullptr, bool p_force_deselect = false);
-	int propagate_mouse_event(const Point2i &p_pos, int x_ofs, int y_ofs, bool p_double_click, TreeItem *p_item, int p_button, const Ref<InputEventWithModifiers> &p_mod);
+	int propagate_mouse_event(const Point2i &p_pos, int x_ofs, int y_ofs, int x_limit, bool p_double_click, TreeItem *p_item, int p_button, const Ref<InputEventWithModifiers> &p_mod);
 	void _text_editor_submit(String p_text);
 	void _text_editor_modal_close();
 	void value_editor_changed(double p_value);
@@ -502,6 +506,7 @@ private:
 		Color parent_hl_line_color;
 		Color children_hl_line_color;
 		Color custom_button_font_highlight;
+		Color font_outline_color;
 
 		int hseparation = 0;
 		int vseparation = 0;
@@ -516,6 +521,7 @@ private:
 		int draw_guides = 0;
 		int scroll_border = 0;
 		int scroll_speed = 0;
+		int font_outline_size = 0;
 
 		enum ClickType {
 			CLICK_NONE,
@@ -538,6 +544,8 @@ private:
 
 		Point2i text_editor_position;
 
+		bool rtl = false;
+
 	} cache;
 
 	int _get_title_button_height() const;
@@ -545,6 +553,9 @@ private:
 	void _scroll_moved(float p_value);
 	HScrollBar *h_scroll;
 	VScrollBar *v_scroll;
+
+	bool h_scroll_enabled = true;
+	bool v_scroll_enabled = true;
 
 	Size2 get_internal_min_size() const;
 	void update_cache();
@@ -623,12 +634,19 @@ public:
 	void clear();
 
 	TreeItem *create_item(TreeItem *p_parent = nullptr, int p_idx = -1);
-	TreeItem *get_root();
-	TreeItem *get_last_item();
+	TreeItem *get_root() const;
+	TreeItem *get_last_item() const;
 
-	void set_column_min_width(int p_column, int p_min_width);
+	void set_column_custom_minimum_width(int p_column, int p_min_width);
 	void set_column_expand(int p_column, bool p_expand);
+	void set_column_expand_ratio(int p_column, int p_ratio);
+	void set_column_clip_content(int p_column, bool p_fit);
+	int get_column_minimum_width(int p_column) const;
 	int get_column_width(int p_column) const;
+	int get_column_expand_ratio(int p_column) const;
+
+	bool is_column_expanding(int p_column) const;
+	bool is_column_clipping_content(int p_column) const;
 
 	void set_hide_root(bool p_enabled);
 	bool is_root_hidden() const;
@@ -679,6 +697,10 @@ public:
 
 	Point2 get_scroll() const;
 	void scroll_to_item(TreeItem *p_item);
+	void set_h_scroll_enabled(bool p_enable);
+	bool is_h_scroll_enabled() const;
+	void set_v_scroll_enabled(bool p_enable);
+	bool is_v_scroll_enabled() const;
 
 	void set_cursor_can_exit_tree(bool p_enable);
 

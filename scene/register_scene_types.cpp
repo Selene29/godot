@@ -31,6 +31,7 @@
 #include "register_scene_types.h"
 
 #include "core/config/project_settings.h"
+#include "core/extension/native_extension_manager.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
 #include "scene/2d/animated_sprite_2d.h"
@@ -146,6 +147,7 @@
 #include "scene/resources/font.h"
 #include "scene/resources/gradient.h"
 #include "scene/resources/height_map_shape_3d.h"
+#include "scene/resources/immediate_mesh.h"
 #include "scene/resources/line_shape_2d.h"
 #include "scene/resources/material.h"
 #include "scene/resources/mesh.h"
@@ -203,7 +205,6 @@
 #include "scene/3d/decal.h"
 #include "scene/3d/gpu_particles_3d.h"
 #include "scene/3d/gpu_particles_collision_3d.h"
-#include "scene/3d/immediate_geometry_3d.h"
 #include "scene/3d/light_3d.h"
 #include "scene/3d/lightmap_gi.h"
 #include "scene/3d/lightmap_probe.h"
@@ -458,7 +459,6 @@ void register_scene_types() {
 	ClassDB::register_class<MeshInstance3D>();
 	ClassDB::register_class<OccluderInstance3D>();
 	ClassDB::register_class<Occluder3D>();
-	ClassDB::register_class<ImmediateGeometry3D>();
 	ClassDB::register_virtual_class<SpriteBase3D>();
 	ClassDB::register_class<Sprite3D>();
 	ClassDB::register_class<AnimatedSprite3D>();
@@ -717,6 +717,7 @@ void register_scene_types() {
 
 	ClassDB::register_virtual_class<Mesh>();
 	ClassDB::register_class<ArrayMesh>();
+	ClassDB::register_class<ImmediateMesh>();
 	ClassDB::register_class<MultiMesh>();
 	ClassDB::register_class<SurfaceTool>();
 	ClassDB::register_class<MeshDataTool>();
@@ -773,6 +774,7 @@ void register_scene_types() {
 	ClassDB::register_class<AtlasTexture>();
 	ClassDB::register_class<MeshTexture>();
 	ClassDB::register_class<CurveTexture>();
+	ClassDB::register_class<Curve3Texture>();
 	ClassDB::register_class<GradientTexture>();
 	ClassDB::register_class<ProxyTexture>();
 	ClassDB::register_class<AnimatedTexture>();
@@ -935,14 +937,12 @@ void register_scene_types() {
 	ClassDB::add_compatibility_class("Physics2DServerSW", "PhysicsServer2DSW");
 	ClassDB::add_compatibility_class("Physics2DServer", "PhysicsServer2D");
 	ClassDB::add_compatibility_class("Physics2DShapeQueryParameters", "PhysicsShapeQueryParameters2D");
-	ClassDB::add_compatibility_class("Physics2DShapeQueryResult", "PhysicsShapeQueryResult2D");
 	ClassDB::add_compatibility_class("Physics2DTestMotionResult", "PhysicsTestMotionResult2D");
 	ClassDB::add_compatibility_class("PhysicsBody", "PhysicsBody3D");
 	ClassDB::add_compatibility_class("PhysicsDirectBodyState", "PhysicsDirectBodyState3D");
 	ClassDB::add_compatibility_class("PhysicsDirectSpaceState", "PhysicsDirectSpaceState3D");
 	ClassDB::add_compatibility_class("PhysicsServer", "PhysicsServer3D");
 	ClassDB::add_compatibility_class("PhysicsShapeQueryParameters", "PhysicsShapeQueryParameters3D");
-	ClassDB::add_compatibility_class("PhysicsShapeQueryResult", "PhysicsShapeQueryResult3D");
 	ClassDB::add_compatibility_class("PinJoint", "PinJoint3D");
 	ClassDB::add_compatibility_class("PlaneShape", "WorldMarginShape3D");
 	ClassDB::add_compatibility_class("ProceduralSky", "Sky");
@@ -1040,9 +1040,13 @@ void register_scene_types() {
 		}
 	}
 	SceneDebugger::initialize();
+
+	NativeExtensionManager::get_singleton()->initialize_extensions(NativeExtension::INITIALIZATION_LEVEL_SCENE);
 }
 
 void unregister_scene_types() {
+	NativeExtensionManager::get_singleton()->deinitialize_extensions(NativeExtension::INITIALIZATION_LEVEL_SCENE);
+
 	SceneDebugger::deinitialize();
 	clear_default_theme();
 

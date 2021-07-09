@@ -929,6 +929,15 @@ bool Viewport::is_audio_listener_2d() const {
 	return audio_listener_2d;
 }
 
+void Viewport::set_disable_3d(bool p_disable) {
+	disable_3d = p_disable;
+	RenderingServer::get_singleton()->viewport_set_disable_3d(viewport, disable_3d);
+}
+
+bool Viewport::is_3d_disabled() const {
+	return disable_3d;
+}
+
 void Viewport::enable_canvas_transform_override(bool p_enable) {
 	if (override_canvas_transform == p_enable) {
 		return;
@@ -1746,7 +1755,7 @@ Control *Viewport::_gui_find_control_at_pos(CanvasItem *p_node, const Point2 &p_
 
 	Control *c = Object::cast_to<Control>(p_node);
 
-	if (!c || !c->clips_input() || c->has_point(matrix.affine_inverse().xform(p_global))) {
+	if (!c || !c->is_clipping_contents() || c->has_point(matrix.affine_inverse().xform(p_global))) {
 		for (int i = p_node->get_child_count() - 1; i >= 0; i--) {
 			CanvasItem *ci = Object::cast_to<CanvasItem>(p_node->get_child(i));
 			if (!ci || ci->is_set_as_top_level()) {
@@ -1770,7 +1779,7 @@ Control *Viewport::_gui_find_control_at_pos(CanvasItem *p_node, const Point2 &p_
 	}
 
 	Control *drag_preview = _gui_get_drag_preview();
-	if (!drag_preview || (c != drag_preview && !drag_preview->is_a_parent_of(c))) {
+	if (!drag_preview || (c != drag_preview && !drag_preview->is_ancestor_of(c))) {
 		r_inv_xform = matrix;
 		return c;
 	}
@@ -3023,7 +3032,7 @@ void Viewport::input(const Ref<InputEvent> &p_event, bool p_local_coords) {
 		return;
 	}
 
-	if (Engine::get_singleton()->is_editor_hint() && get_tree()->get_edited_scene_root() && get_tree()->get_edited_scene_root()->is_a_parent_of(this)) {
+	if (Engine::get_singleton()->is_editor_hint() && get_tree()->get_edited_scene_root() && get_tree()->get_edited_scene_root()->is_ancestor_of(this)) {
 		return;
 	}
 
@@ -3065,7 +3074,7 @@ void Viewport::unhandled_input(const Ref<InputEvent> &p_event, bool p_local_coor
 		return;
 	}
 
-	if (Engine::get_singleton()->is_editor_hint() && get_tree()->get_edited_scene_root() && get_tree()->get_edited_scene_root()->is_a_parent_of(this)) {
+	if (Engine::get_singleton()->is_editor_hint() && get_tree()->get_edited_scene_root() && get_tree()->get_edited_scene_root()->is_ancestor_of(this)) {
 		return;
 	}
 
@@ -3259,8 +3268,8 @@ Viewport::DebugDraw Viewport::get_debug_draw() const {
 	return debug_draw;
 }
 
-int Viewport::get_render_info(RenderInfo p_info) {
-	return RS::get_singleton()->viewport_get_render_info(viewport, RS::ViewportRenderInfo(p_info));
+int Viewport::get_render_info(RenderInfoType p_type, RenderInfo p_info) {
+	return RS::get_singleton()->viewport_get_render_info(viewport, RS::ViewportRenderInfoType(p_type), RS::ViewportRenderInfo(p_info));
 }
 
 void Viewport::set_snap_controls_to_pixels(bool p_enable) {
@@ -3490,7 +3499,7 @@ void Viewport::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_debug_draw", "debug_draw"), &Viewport::set_debug_draw);
 	ClassDB::bind_method(D_METHOD("get_debug_draw"), &Viewport::get_debug_draw);
 
-	ClassDB::bind_method(D_METHOD("get_render_info", "info"), &Viewport::get_render_info);
+	ClassDB::bind_method(D_METHOD("get_render_info", "type", "info"), &Viewport::get_render_info);
 
 	ClassDB::bind_method(D_METHOD("set_use_xr", "use"), &Viewport::set_use_xr);
 	ClassDB::bind_method(D_METHOD("is_using_xr"), &Viewport::is_using_xr);
@@ -3515,6 +3524,9 @@ void Viewport::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_as_audio_listener_2d", "enable"), &Viewport::set_as_audio_listener_2d);
 	ClassDB::bind_method(D_METHOD("is_audio_listener_2d"), &Viewport::is_audio_listener_2d);
+
+	ClassDB::bind_method(D_METHOD("set_disable_3d", "disable"), &Viewport::set_disable_3d);
+	ClassDB::bind_method(D_METHOD("is_3d_disabled"), &Viewport::is_3d_disabled);
 
 	ClassDB::bind_method(D_METHOD("get_mouse_position"), &Viewport::get_mouse_position);
 	ClassDB::bind_method(D_METHOD("warp_mouse", "to_position"), &Viewport::warp_mouse);
@@ -3582,6 +3594,7 @@ void Viewport::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "snap_2d_transforms_to_pixel"), "set_snap_2d_transforms_to_pixel", "is_snap_2d_transforms_to_pixel_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "snap_2d_vertices_to_pixel"), "set_snap_2d_vertices_to_pixel", "is_snap_2d_vertices_to_pixel_enabled");
 	ADD_GROUP("Rendering", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "disable_3d"), "set_disable_3d", "is_3d_disabled");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "msaa", PROPERTY_HINT_ENUM, "Disabled (Fastest),2x (Fast),4x (Average),8x (Slow),16x (Slower)"), "set_msaa", "get_msaa");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "screen_space_aa", PROPERTY_HINT_ENUM, "Disabled (Fastest),FXAA (Fast)"), "set_screen_space_aa", "get_screen_space_aa");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_debanding"), "set_use_debanding", "is_using_debanding");
@@ -3637,12 +3650,13 @@ void Viewport::_bind_methods() {
 	BIND_ENUM_CONSTANT(SCREEN_SPACE_AA_MAX);
 
 	BIND_ENUM_CONSTANT(RENDER_INFO_OBJECTS_IN_FRAME);
-	BIND_ENUM_CONSTANT(RENDER_INFO_VERTICES_IN_FRAME);
-	BIND_ENUM_CONSTANT(RENDER_INFO_MATERIAL_CHANGES_IN_FRAME);
-	BIND_ENUM_CONSTANT(RENDER_INFO_SHADER_CHANGES_IN_FRAME);
-	BIND_ENUM_CONSTANT(RENDER_INFO_SURFACE_CHANGES_IN_FRAME);
+	BIND_ENUM_CONSTANT(RENDER_INFO_PRIMITIVES_IN_FRAME);
 	BIND_ENUM_CONSTANT(RENDER_INFO_DRAW_CALLS_IN_FRAME);
 	BIND_ENUM_CONSTANT(RENDER_INFO_MAX);
+
+	BIND_ENUM_CONSTANT(RENDER_INFO_TYPE_VISIBLE);
+	BIND_ENUM_CONSTANT(RENDER_INFO_TYPE_SHADOW);
+	BIND_ENUM_CONSTANT(RENDER_INFO_TYPE_MAX);
 
 	BIND_ENUM_CONSTANT(DEBUG_DRAW_DISABLED);
 	BIND_ENUM_CONSTANT(DEBUG_DRAW_UNSHADED);

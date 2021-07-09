@@ -5537,6 +5537,8 @@ struct EditorSceneImporterGLTFInterpolate<Quaternion> {
 
 template <class T>
 T GLTFDocument::_interpolate_track(const Vector<float> &p_times, const Vector<T> &p_values, const float p_time, const GLTFAnimation::Interpolation p_interp) {
+	ERR_FAIL_COND_V(!p_values.size(), T());
+	ERR_FAIL_COND_V(p_times.size() != p_values.size(), p_values[0]);
 	//could use binary search, worth it?
 	int idx = -1;
 	for (int i = 0; i < p_times.size(); i++) {
@@ -6087,7 +6089,7 @@ GLTFAnimation::Track GLTFDocument::_convert_animation_track(Ref<GLTFState> state
 				Vector3 translation = p_animation->track_get_key_value(p_track_i, key_i);
 				p_track.translation_track.values.write[key_i] = translation;
 			}
-		} else if (path.find(":rotation_degrees") != -1) {
+		} else if (path.find(":rotation") != -1) {
 			p_track.rotation_track.times = times;
 			p_track.rotation_track.interpolation = gltf_interpolation;
 
@@ -6095,11 +6097,7 @@ GLTFAnimation::Track GLTFDocument::_convert_animation_track(Ref<GLTFState> state
 			p_track.rotation_track.interpolation = gltf_interpolation;
 
 			for (int32_t key_i = 0; key_i < key_count; key_i++) {
-				Vector3 rotation_degrees = p_animation->track_get_key_value(p_track_i, key_i);
-				Vector3 rotation_radian;
-				rotation_radian.x = Math::deg2rad(rotation_degrees.x);
-				rotation_radian.y = Math::deg2rad(rotation_degrees.y);
-				rotation_radian.z = Math::deg2rad(rotation_degrees.z);
+				Vector3 rotation_radian = p_animation->track_get_key_value(p_track_i, key_i);
 				p_track.rotation_track.values.write[key_i] = Quaternion(rotation_radian);
 			}
 		} else if (path.find(":scale") != -1) {

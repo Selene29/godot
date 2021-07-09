@@ -888,6 +888,7 @@ void VisualShaderGraphPlugin::remove_node(VisualShader::Type p_type, int p_id) {
 void VisualShaderGraphPlugin::connect_nodes(VisualShader::Type p_type, int p_from_node, int p_from_port, int p_to_node, int p_to_port) {
 	if (visual_shader->get_shader_type() == p_type) {
 		VisualShaderEditor::get_singleton()->graph->connect_node(itos(p_from_node), p_from_port, itos(p_to_node), p_to_port);
+		connections.push_back({ p_from_node, p_from_port, p_to_node, p_to_port });
 		if (links[p_to_node].input_ports.has(p_to_port) && links[p_to_node].input_ports[p_to_port].default_input_button != nullptr) {
 			links[p_to_node].input_ports[p_to_port].default_input_button->hide();
 		}
@@ -897,6 +898,12 @@ void VisualShaderGraphPlugin::connect_nodes(VisualShader::Type p_type, int p_fro
 void VisualShaderGraphPlugin::disconnect_nodes(VisualShader::Type p_type, int p_from_node, int p_from_port, int p_to_node, int p_to_port) {
 	if (visual_shader->get_shader_type() == p_type) {
 		VisualShaderEditor::get_singleton()->graph->disconnect_node(itos(p_from_node), p_from_port, itos(p_to_node), p_to_port);
+		for (List<VisualShader::Connection>::Element *E = connections.front(); E; E = E->next()) {
+			if (E->get().from_node == p_from_node && E->get().from_port == p_from_port && E->get().to_node == p_to_node && E->get().to_port == p_to_port) {
+				connections.erase(E);
+				break;
+			}
+		}
 		if (links[p_to_node].input_ports.has(p_to_port) && links[p_to_node].input_ports[p_to_port].default_input_button != nullptr && links[p_to_node].visual_node->get_input_port_default_value(p_to_port).get_type() != Variant::NIL) {
 			links[p_to_node].input_ports[p_to_port].default_input_button->show();
 			set_input_port_default_value(p_type, p_to_node, p_to_port, links[p_to_node].visual_node->get_input_port_default_value(p_to_port));
@@ -2315,6 +2322,13 @@ void VisualShaderEditor::_add_node(int p_idx, int p_op_idx, String p_resource_pa
 				undo_redo->add_do_method(graph_plugin.ptr(), "connect_nodes", type, _from_node, _from_slot, to_node, to_slot);
 				undo_redo->add_undo_method(graph_plugin.ptr(), "disconnect_nodes", type, _from_node, _from_slot, to_node, to_slot);
 			} else {
+				// Need to setting up Input node properly before committing since `is_port_types_compatible` (calling below) is using `mode` and `shader_type`.
+				VisualShaderNodeInput *input = Object::cast_to<VisualShaderNodeInput>(vsnode.ptr());
+				if (input) {
+					input->set_shader_mode(visual_shader->get_mode());
+					input->set_shader_type(visual_shader->get_shader_type());
+				}
+
 				// Attempting to connect to the first correct port.
 				for (int i = 0; i < vsnode->get_output_port_count(); i++) {
 					if (visual_shader->is_port_types_compatible(vsnode->get_output_port_type(i), input_port_type)) {
@@ -4857,7 +4871,7 @@ void EditorInspectorShaderModePlugin::parse_begin(Object *p_object) {
 	//do none
 }
 
-bool EditorInspectorShaderModePlugin::parse_property(Object *p_object, Variant::Type p_type, const String &p_path, PropertyHint p_hint, const String &p_hint_text, int p_usage, bool p_wide) {
+bool EditorInspectorShaderModePlugin::parse_property(Object *p_object, const Variant::Type p_type, const String &p_path, const PropertyHint p_hint, const String &p_hint_text, const uint32_t p_usage, const bool p_wide) {
 	if (p_path == "mode" && p_object->is_class("VisualShader") && p_type == Variant::INT) {
 		EditorPropertyShaderMode *editor = memnew(EditorPropertyShaderMode);
 		Vector<String> options = p_hint_text.split(",");

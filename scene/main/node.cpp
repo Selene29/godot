@@ -403,6 +403,7 @@ void Node::set_process_mode(ProcessMode p_mode) {
 	}
 
 	bool prev_can_process = can_process();
+	bool prev_enabled = _is_enabled();
 
 	data.process_mode = p_mode;
 
@@ -417,6 +418,7 @@ void Node::set_process_mode(ProcessMode p_mode) {
 	}
 
 	bool next_can_process = can_process();
+	bool next_enabled = _is_enabled();
 
 	int pause_notification = 0;
 
@@ -426,7 +428,16 @@ void Node::set_process_mode(ProcessMode p_mode) {
 		pause_notification = NOTIFICATION_UNPAUSED;
 	}
 
-	_propagate_process_owner(data.process_owner, pause_notification);
+	int enabled_notification = 0;
+
+	if (prev_enabled && !next_enabled) {
+		enabled_notification = NOTIFICATION_DISABLED;
+	} else if (!prev_enabled && next_enabled) {
+		enabled_notification = NOTIFICATION_ENABLED;
+	}
+
+	_propagate_process_owner(data.process_owner, pause_notification, enabled_notification);
+
 #ifdef TOOLS_ENABLED
 	// This is required for the editor to update the visibility of disabled nodes
 	// It's very expensive during runtime to change, so editor-only
@@ -455,17 +466,21 @@ Node::ProcessMode Node::get_process_mode() const {
 	return data.process_mode;
 }
 
-void Node::_propagate_process_owner(Node *p_owner, int p_notification) {
+void Node::_propagate_process_owner(Node *p_owner, int p_pause_notification, int p_enabled_notification) {
 	data.process_owner = p_owner;
 
-	if (p_notification != 0) {
-		notification(p_notification);
+	if (p_pause_notification != 0) {
+		notification(p_pause_notification);
+	}
+
+	if (p_enabled_notification != 0) {
+		notification(p_enabled_notification);
 	}
 
 	for (int i = 0; i < data.children.size(); i++) {
 		Node *c = data.children[i];
 		if (c->data.process_mode == PROCESS_MODE_INHERIT) {
-			c->_propagate_process_owner(p_owner, p_notification);
+			c->_propagate_process_owner(p_owner, p_pause_notification, p_enabled_notification);
 		}
 	}
 }
@@ -667,6 +682,27 @@ bool Node::_can_process(bool p_paused) const {
 	} else {
 		return process_mode == PROCESS_MODE_PAUSABLE;
 	}
+}
+
+bool Node::_is_enabled() const {
+	ProcessMode process_mode;
+
+	if (data.process_mode == PROCESS_MODE_INHERIT) {
+		if (!data.process_owner) {
+			process_mode = PROCESS_MODE_PAUSABLE;
+		} else {
+			process_mode = data.process_owner->data.process_mode;
+		}
+	} else {
+		process_mode = data.process_mode;
+	}
+
+	return (process_mode != PROCESS_MODE_DISABLED);
+}
+
+bool Node::is_enabled() const {
+	ERR_FAIL_COND_V(!is_inside_tree(), false);
+	return _is_enabled();
 }
 
 float Node::get_physics_process_delta_time() const {
@@ -1041,7 +1077,7 @@ void Node::add_child(Node *p_child, bool p_legible_unique_name) {
 	ERR_FAIL_COND_MSG(p_child == this, vformat("Can't add child '%s' to itself.", p_child->get_name())); // adding to itself!
 	ERR_FAIL_COND_MSG(p_child->data.parent, vformat("Can't add child '%s' to '%s', already has a parent '%s'.", p_child->get_name(), get_name(), p_child->data.parent->get_name())); //Fail if node has a parent
 #ifdef DEBUG_ENABLED
-	ERR_FAIL_COND_MSG(p_child->is_a_parent_of(this), vformat("Can't add child '%s' to '%s' as it would result in a cyclic dependency since '%s' is already a parent of '%s'.", p_child->get_name(), get_name(), p_child->get_name(), get_name()));
+	ERR_FAIL_COND_MSG(p_child->is_ancestor_of(this), vformat("Can't add child '%s' to '%s' as it would result in a cyclic dependency since '%s' is already a parent of '%s'.", p_child->get_name(), get_name(), p_child->get_name(), get_name()));
 #endif
 	ERR_FAIL_COND_MSG(data.blocked > 0, "Parent node is busy setting up children, add_node() failed. Consider using call_deferred(\"add_child\", child) instead.");
 
@@ -1284,7 +1320,7 @@ Node *Node::find_parent(const String &p_mask) const {
 	return nullptr;
 }
 
-bool Node::is_a_parent_of(const Node *p_node) const {
+bool Node::is_ancestor_of(const Node *p_node) const {
 	ERR_FAIL_NULL_V(p_node, false);
 	Node *p = p_node->data.parent;
 	while (p) {
@@ -1749,7 +1785,7 @@ String Node::get_editor_description() const {
 
 void Node::set_editable_instance(Node *p_node, bool p_editable) {
 	ERR_FAIL_NULL(p_node);
-	ERR_FAIL_COND(!is_a_parent_of(p_node));
+	ERR_FAIL_COND(!is_ancestor_of(p_node));
 	if (!p_editable) {
 		p_node->data.editable_instance = false;
 		// Avoid this flag being needlessly saved;
@@ -1764,13 +1800,13 @@ bool Node::is_editable_instance(const Node *p_node) const {
 	if (!p_node) {
 		return false; // Easier, null is never editable. :)
 	}
-	ERR_FAIL_COND_V(!is_a_parent_of(p_node), false);
+	ERR_FAIL_COND_V(!is_ancestor_of(p_node), false);
 	return p_node->data.editable_instance;
 }
 
 Node *Node::get_deepest_editable_node(Node *p_start_node) const {
 	ERR_FAIL_NULL_V(p_start_node, nullptr);
-	ERR_FAIL_COND_V(!is_a_parent_of(p_start_node), p_start_node);
+	ERR_FAIL_COND_V(!is_ancestor_of(p_start_node), p_start_node);
 
 	Node const *iterated_item = p_start_node;
 	Node *node = p_start_node;
@@ -2074,7 +2110,7 @@ void Node::remap_nested_resources(RES p_resource, const Map<RES, RES> &p_resourc
 // because re-targeting of connections from some descendant to another is not possible
 // if the emitter node comes later in tree order than the receiver
 void Node::_duplicate_signals(const Node *p_original, Node *p_copy) const {
-	if ((this != p_original) && !(p_original->is_a_parent_of(this))) {
+	if ((this != p_original) && !(p_original->is_ancestor_of(this))) {
 		return;
 	}
 
@@ -2457,7 +2493,9 @@ String Node::get_configuration_warnings_as_string() const {
 		if (i > 0) {
 			all_warnings += "\n\n";
 		}
-		all_warnings += String(warnings[i]);
+		// Format as a bullet point list to make multiple warnings easier to distinguish
+		// from each other.
+		all_warnings += String::utf8("•  ") + String(warnings[i]);
 	}
 	return all_warnings;
 }
@@ -2467,7 +2505,7 @@ void Node::update_configuration_warnings() {
 	if (!is_inside_tree()) {
 		return;
 	}
-	if (get_tree()->get_edited_scene_root() && (get_tree()->get_edited_scene_root() == this || get_tree()->get_edited_scene_root()->is_a_parent_of(this))) {
+	if (get_tree()->get_edited_scene_root() && (get_tree()->get_edited_scene_root() == this || get_tree()->get_edited_scene_root()->is_ancestor_of(this))) {
 		get_tree()->emit_signal(SceneStringNames::get_singleton()->node_configuration_warning_changed, this);
 	}
 #endif
@@ -2514,7 +2552,7 @@ void Node::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_node_and_resource", "path"), &Node::_get_node_and_resource);
 
 	ClassDB::bind_method(D_METHOD("is_inside_tree"), &Node::is_inside_tree);
-	ClassDB::bind_method(D_METHOD("is_a_parent_of", "node"), &Node::is_a_parent_of);
+	ClassDB::bind_method(D_METHOD("is_ancestor_of", "node"), &Node::is_ancestor_of);
 	ClassDB::bind_method(D_METHOD("is_greater_than", "node"), &Node::is_greater_than);
 	ClassDB::bind_method(D_METHOD("get_path"), &Node::get_path);
 	ClassDB::bind_method(D_METHOD("get_path_to", "node"), &Node::get_path_to);
@@ -2628,6 +2666,8 @@ void Node::_bind_methods() {
 	BIND_CONSTANT(NOTIFICATION_INTERNAL_PROCESS);
 	BIND_CONSTANT(NOTIFICATION_INTERNAL_PHYSICS_PROCESS);
 	BIND_CONSTANT(NOTIFICATION_POST_ENTER_TREE);
+	BIND_CONSTANT(NOTIFICATION_DISABLED);
+	BIND_CONSTANT(NOTIFICATION_ENABLED);
 
 	BIND_CONSTANT(NOTIFICATION_EDITOR_PRE_SAVE);
 	BIND_CONSTANT(NOTIFICATION_EDITOR_POST_SAVE);

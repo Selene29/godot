@@ -155,8 +155,12 @@ public:
 
 		virtual void set_render_priority(int p_priority) = 0;
 		virtual void set_next_pass(RID p_pass) = 0;
-		virtual void update_parameters(const Map<StringName, Variant> &p_parameters, bool p_uniform_dirty, bool p_textures_dirty) = 0;
+		virtual bool update_parameters(const Map<StringName, Variant> &p_parameters, bool p_uniform_dirty, bool p_textures_dirty) = 0;
 		virtual ~MaterialData();
+
+		//to be used internally by update_parameters, in the most common configuration of material parameters
+		bool update_parameters_uniform_set(const Map<StringName, Variant> &p_parameters, bool p_uniform_dirty, bool p_textures_dirty, const Map<StringName, ShaderLanguage::ShaderNode::Uniform> &p_uniforms, const uint32_t *p_uniform_offsets, const Vector<ShaderCompilerRD::GeneratedCode::Texture> &p_texture_uniforms, const Map<StringName, RID> &p_default_texture_params, uint32_t p_ubo_size, RID &uniform_set, RID p_shader, uint32_t p_shader_uniform_set, uint32_t p_barrier = RD::BARRIER_MASK_ALL);
+		void free_parameters_uniform_set(RID p_uniform_set);
 
 	private:
 		friend class RendererStorageRD;
@@ -165,8 +169,14 @@ public:
 		List<RID>::Element *global_texture_E = nullptr;
 		uint64_t global_textures_pass = 0;
 		Map<StringName, uint64_t> used_global_textures;
+
+		//internally by update_parameters_uniform_set
+		Vector<uint8_t> ubo_data;
+		RID uniform_buffer;
+		Vector<RID> texture_cache;
 	};
 	typedef MaterialData *(*MaterialDataRequestFunction)(ShaderData *);
+	static void _material_uniform_set_erased(const RID &p_set, void *p_material);
 
 	enum DefaultRDTexture {
 		DEFAULT_RD_TEXTURE_WHITE,
@@ -221,7 +231,7 @@ private:
 		~CanvasTexture();
 	};
 
-	RID_PtrOwner<CanvasTexture, true> canvas_texture_owner;
+	RID_Owner<CanvasTexture, true> canvas_texture_owner;
 
 	/* TEXTURE API */
 	struct Texture {
@@ -373,25 +383,28 @@ private:
 
 	struct Material {
 		RID self;
-		MaterialData *data;
-		Shader *shader;
+		MaterialData *data = nullptr;
+		Shader *shader = nullptr;
 		//shortcut to shader data and type
-		ShaderType shader_type;
+		ShaderType shader_type = SHADER_TYPE_MAX;
 		uint32_t shader_id = 0;
-		bool update_requested;
-		bool uniform_dirty;
-		bool texture_dirty;
-		Material *update_next;
+		bool uniform_dirty = false;
+		bool texture_dirty = false;
 		Map<StringName, Variant> params;
-		int32_t priority;
+		int32_t priority = 0;
 		RID next_pass;
+		SelfList<Material> update_element;
+
 		Dependency dependency;
+
+		Material() :
+				update_element(this) {}
 	};
 
 	MaterialDataRequestFunction material_data_request_func[SHADER_TYPE_MAX];
 	mutable RID_Owner<Material, true> material_owner;
 
-	Material *material_update_list;
+	SelfList<Material>::List material_update_list;
 	void _material_queue_update(Material *material, bool p_uniform, bool p_texture);
 	void _update_queued_materials();
 
@@ -434,6 +447,7 @@ private:
 
 			struct LOD {
 				float edge_length = 0.0;
+				uint32_t index_count = 0;
 				RID index_buffer;
 				RID index_array;
 			};
@@ -513,7 +527,7 @@ private:
 	void _mesh_instance_clear(MeshInstance *mi);
 	void _mesh_instance_add_surface(MeshInstance *mi, Mesh *mesh, uint32_t p_surface);
 
-	mutable RID_PtrOwner<MeshInstance> mesh_instance_owner;
+	mutable RID_Owner<MeshInstance> mesh_instance_owner;
 
 	SelfList<MeshInstance>::List dirty_mesh_instance_weights;
 	SelfList<MeshInstance>::List dirty_mesh_instance_arrays;
@@ -894,17 +908,14 @@ private:
 	}
 
 	struct ParticlesMaterialData : public MaterialData {
-		uint64_t last_frame;
-		ParticlesShaderData *shader_data;
-		RID uniform_buffer;
+		uint64_t last_frame = 0;
+		ParticlesShaderData *shader_data = nullptr;
 		RID uniform_set;
-		Vector<RID> texture_cache;
-		Vector<uint8_t> ubo_data;
-		bool uniform_set_updated;
+		bool uniform_set_updated = false;
 
 		virtual void set_render_priority(int p_priority) {}
 		virtual void set_next_pass(RID p_pass) {}
-		virtual void update_parameters(const Map<StringName, Variant> &p_parameters, bool p_uniform_dirty, bool p_textures_dirty);
+		virtual bool update_parameters(const Map<StringName, Variant> &p_parameters, bool p_uniform_dirty, bool p_textures_dirty);
 		virtual ~ParticlesMaterialData();
 	};
 
@@ -1002,7 +1013,6 @@ private:
 		uint32_t cull_mask = 0xFFFFFFFF;
 		RS::LightOmniShadowMode omni_shadow_mode = RS::LIGHT_OMNI_SHADOW_DUAL_PARABOLOID;
 		RS::LightDirectionalShadowMode directional_shadow_mode = RS::LIGHT_DIRECTIONAL_SHADOW_ORTHOGONAL;
-		RS::LightDirectionalShadowDepthRangeMode directional_range_mode = RS::LIGHT_DIRECTIONAL_SHADOW_DEPTH_RANGE_STABLE;
 		bool directional_blend_splits = false;
 		bool directional_sky_only = false;
 		uint64_t version = 0;
@@ -1076,8 +1086,6 @@ private:
 
 		float dynamic_range = 4.0;
 		float energy = 1.0;
-		float ao = 0.0;
-		float ao_size = 0.5;
 		float bias = 1.4;
 		float normal_bias = 0.0;
 		float propagation = 0.7;
@@ -1298,7 +1306,6 @@ public:
 
 	virtual void _texture_2d_update(RID p_texture, const Ref<Image> &p_image, int p_layer, bool p_immediate);
 
-	virtual void texture_2d_update_immediate(RID p_texture, const Ref<Image> &p_image, int p_layer = 0); //mostly used for video and streaming
 	virtual void texture_2d_update(RID p_texture, const Ref<Image> &p_image, int p_layer = 0);
 	virtual void texture_3d_update(RID p_texture, const Vector<Ref<Image>> &p_data);
 	virtual void texture_proxy_update(RID p_texture, RID p_proxy_to);
@@ -1457,7 +1464,9 @@ public:
 	virtual void mesh_set_blend_shape_mode(RID p_mesh, RS::BlendShapeMode p_mode);
 	virtual RS::BlendShapeMode mesh_get_blend_shape_mode(RID p_mesh) const;
 
-	virtual void mesh_surface_update_region(RID p_mesh, int p_surface, int p_offset, const Vector<uint8_t> &p_data);
+	virtual void mesh_surface_update_vertex_region(RID p_mesh, int p_surface, int p_offset, const Vector<uint8_t> &p_data);
+	virtual void mesh_surface_update_attribute_region(RID p_mesh, int p_surface, int p_offset, const Vector<uint8_t> &p_data);
+	virtual void mesh_surface_update_skin_region(RID p_mesh, int p_surface, int p_offset, const Vector<uint8_t> &p_data);
 
 	virtual void mesh_surface_set_material(RID p_mesh, int p_surface, RID p_material);
 	virtual RID mesh_surface_get_material(RID p_mesh, int p_surface) const;
@@ -1526,10 +1535,18 @@ public:
 		return s->lod_count > 0;
 	}
 
-	_FORCE_INLINE_ uint32_t mesh_surface_get_lod(void *p_surface, float p_model_scale, float p_distance_threshold, float p_lod_threshold) const {
+	_FORCE_INLINE_ uint32_t mesh_surface_get_vertices_drawn_count(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->index_count ? s->index_count : s->vertex_count;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_lod(void *p_surface, float p_model_scale, float p_distance_threshold, float p_lod_threshold, uint32_t *r_index_count = nullptr) const {
 		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
 
 		int32_t current_lod = -1;
+		if (r_index_count) {
+			*r_index_count = s->index_count;
+		}
 		for (uint32_t i = 0; i < s->lod_count; i++) {
 			float screen_size = s->lods[i].edge_length * p_model_scale / p_distance_threshold;
 			if (screen_size > p_lod_threshold) {
@@ -1540,6 +1557,9 @@ public:
 		if (current_lod == -1) {
 			return 0;
 		} else {
+			if (r_index_count) {
+				*r_index_count = s->lods[current_lod].index_count;
+			}
 			return current_lod + 1;
 		}
 	}
@@ -1746,24 +1766,6 @@ public:
 		return multimesh->uniform_set_2d;
 	}
 
-	/* IMMEDIATE API */
-
-	RID immediate_allocate() { return RID(); }
-	void immediate_initialize(RID p_immediate) {}
-
-	virtual void immediate_begin(RID p_immediate, RS::PrimitiveType p_rimitive, RID p_texture = RID()) {}
-	virtual void immediate_vertex(RID p_immediate, const Vector3 &p_vertex) {}
-	virtual void immediate_normal(RID p_immediate, const Vector3 &p_normal) {}
-	virtual void immediate_tangent(RID p_immediate, const Plane &p_tangent) {}
-	virtual void immediate_color(RID p_immediate, const Color &p_color) {}
-	virtual void immediate_uv(RID p_immediate, const Vector2 &tex_uv) {}
-	virtual void immediate_uv2(RID p_immediate, const Vector2 &tex_uv) {}
-	virtual void immediate_end(RID p_immediate) {}
-	virtual void immediate_clear(RID p_immediate) {}
-	virtual void immediate_set_material(RID p_immediate, RID p_material) {}
-	virtual RID immediate_get_material(RID p_immediate) const { return RID(); }
-	virtual AABB immediate_get_aabb(RID p_immediate) const { return AABB(); }
-
 	/* SKELETON API */
 
 	RID skeleton_allocate();
@@ -1832,8 +1834,6 @@ public:
 	bool light_directional_get_blend_splits(RID p_light) const;
 	void light_directional_set_sky_only(RID p_light, bool p_sky_only);
 	bool light_directional_is_sky_only(RID p_light) const;
-	void light_directional_set_shadow_depth_range_mode(RID p_light, RS::LightDirectionalShadowDepthRangeMode p_range_mode);
-	RS::LightDirectionalShadowDepthRangeMode light_directional_get_shadow_depth_range_mode(RID p_light) const;
 
 	RS::LightDirectionalShadowMode light_directional_get_shadow_mode(RID p_light);
 	RS::LightOmniShadowMode light_omni_get_shadow_mode(RID p_light);
@@ -2055,12 +2055,6 @@ public:
 
 	void voxel_gi_set_energy(RID p_voxel_gi, float p_energy);
 	float voxel_gi_get_energy(RID p_voxel_gi) const;
-
-	void voxel_gi_set_ao(RID p_voxel_gi, float p_ao);
-	float voxel_gi_get_ao(RID p_voxel_gi) const;
-
-	void voxel_gi_set_ao_size(RID p_voxel_gi, float p_strength);
-	float voxel_gi_get_ao_size(RID p_voxel_gi) const;
 
 	void voxel_gi_set_bias(RID p_voxel_gi, float p_bias);
 	float voxel_gi_get_bias(RID p_voxel_gi) const;
@@ -2350,13 +2344,16 @@ public:
 
 	void set_debug_generate_wireframes(bool p_generate) {}
 
-	void render_info_begin_capture() {}
-	void render_info_end_capture() {}
-	int get_captured_render_info(RS::RenderInfo p_info) { return 0; }
+	//keep cached since it can be called form any thread
+	uint64_t texture_mem_cache = 0;
+	uint64_t buffer_mem_cache = 0;
+	uint64_t total_mem_cache = 0;
 
-	uint64_t get_render_info(RS::RenderInfo p_info) { return 0; }
-	String get_video_adapter_name() const { return String(); }
-	String get_video_adapter_vendor() const { return String(); }
+	virtual void update_memory_info();
+	virtual uint64_t get_rendering_info(RS::RenderingInfo p_info);
+
+	String get_video_adapter_name() const;
+	String get_video_adapter_vendor() const;
 
 	virtual void capture_timestamps_begin();
 	virtual void capture_timestamp(const String &p_name);

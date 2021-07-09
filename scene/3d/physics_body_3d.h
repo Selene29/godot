@@ -53,7 +53,7 @@ protected:
 	Ref<KinematicCollision3D> _move(const Vector3 &p_motion, bool p_infinite_inertia = true, bool p_exclude_raycast_shapes = true, bool p_test_only = false, real_t p_margin = 0.001);
 
 public:
-	bool move_and_collide(const Vector3 &p_motion, bool p_infinite_inertia, PhysicsServer3D::MotionResult &r_result, real_t p_margin, bool p_exclude_raycast_shapes = true, bool p_test_only = false);
+	bool move_and_collide(const Vector3 &p_motion, bool p_infinite_inertia, PhysicsServer3D::MotionResult &r_result, real_t p_margin, bool p_exclude_raycast_shapes = true, bool p_test_only = false, bool p_cancel_sliding = true);
 	bool test_move(const Transform3D &p_from, const Vector3 &p_motion, bool p_infinite_inertia = true, bool p_exclude_raycast_shapes = true, const Ref<KinematicCollision3D> &r_collision = Ref<KinematicCollision3D>(), real_t p_margin = 0.001);
 
 	void set_axis_lock(PhysicsServer3D::BodyAxis p_axis, bool p_lock);
@@ -307,9 +307,6 @@ private:
 	real_t get_floor_max_angle() const;
 	void set_floor_max_angle(real_t p_radians);
 
-	real_t get_floor_max_angle_degrees() const;
-	void set_floor_max_angle_degrees(real_t p_degrees);
-
 	const Vector3 &get_snap() const;
 	void set_snap(const Vector3 &p_snap);
 
@@ -550,9 +547,6 @@ public:
 
 	void set_joint_rotation(const Vector3 &p_euler_rad);
 	Vector3 get_joint_rotation() const;
-
-	void set_joint_rotation_degrees(const Vector3 &p_euler_deg);
-	Vector3 get_joint_rotation_degrees() const;
 
 	void set_body_offset(const Transform3D &p_offset);
 	const Transform3D &get_body_offset() const;

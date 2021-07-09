@@ -1985,6 +1985,7 @@ void Image::create(int p_width, int p_height, bool p_use_mipmaps, Format p_forma
 	ERR_FAIL_COND_MSG(p_width > MAX_WIDTH, "Image width cannot be greater than " + itos(MAX_WIDTH) + ".");
 	ERR_FAIL_COND_MSG(p_height > MAX_HEIGHT, "Image height cannot be greater than " + itos(MAX_HEIGHT) + ".");
 	ERR_FAIL_COND_MSG(p_width * p_height > MAX_PIXELS, "Too many pixels for image, maximum is " + itos(MAX_PIXELS));
+	ERR_FAIL_INDEX_MSG(p_format, FORMAT_MAX, "Image format out of range, please see Image's Format enum.");
 
 	int mm = 0;
 	int size = _get_dst_image_size(p_width, p_height, p_format, mm, p_use_mipmaps ? -1 : 0);
@@ -2007,6 +2008,7 @@ void Image::create(int p_width, int p_height, bool p_use_mipmaps, Format p_forma
 	ERR_FAIL_COND_MSG(p_width > MAX_WIDTH, "Image width cannot be greater than " + itos(MAX_WIDTH) + ".");
 	ERR_FAIL_COND_MSG(p_height > MAX_HEIGHT, "Image height cannot be greater than " + itos(MAX_HEIGHT) + ".");
 	ERR_FAIL_COND_MSG(p_width * p_height > MAX_PIXELS, "Too many pixels for image, maximum is " + itos(MAX_PIXELS));
+	ERR_FAIL_INDEX_MSG(p_format, FORMAT_MAX, "Image format out of range, please see Image's Format enum.");
 
 	int mm;
 	int size = _get_dst_image_size(p_width, p_height, p_format, mm, p_use_mipmaps ? -1 : 0);
@@ -2378,6 +2380,8 @@ Error Image::decompress() {
 }
 
 Error Image::compress(CompressMode p_mode, CompressSource p_source, float p_lossy_quality) {
+	ERR_FAIL_INDEX_V_MSG(p_mode, COMPRESS_MAX, ERR_INVALID_PARAMETER, "Invalid compress mode.");
+	ERR_FAIL_INDEX_V_MSG(p_source, COMPRESS_SOURCE_MAX, ERR_INVALID_PARAMETER, "Invalid compress source.");
 	return compress_from_channels(p_mode, detect_used_channels(p_source), p_lossy_quality);
 }
 
@@ -2402,6 +2406,9 @@ Error Image::compress_from_channels(CompressMode p_mode, UsedChannels p_channels
 		case COMPRESS_BPTC: {
 			ERR_FAIL_COND_V(!_image_compress_bptc_func, ERR_UNAVAILABLE);
 			_image_compress_bptc_func(this, p_lossy_quality, p_channels);
+		} break;
+		case COMPRESS_MAX: {
+			ERR_FAIL_V(ERR_INVALID_PARAMETER);
 		} break;
 	}
 
@@ -2997,6 +3004,8 @@ void Image::set_pixel(int p_x, int p_y, const Color &p_color) {
 }
 
 void Image::adjust_bcs(float p_brightness, float p_contrast, float p_saturation) {
+	ERR_FAIL_COND_MSG(!_can_modify(format), "Cannot adjust_bcs in compressed or custom image formats.");
+
 	uint8_t *w = data.ptrw();
 	uint32_t pixel_size = get_format_pixel_size(format);
 	uint32_t pixel_count = data.size() / pixel_size;

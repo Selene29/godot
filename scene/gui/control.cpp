@@ -650,27 +650,11 @@ void Control::_notification(int p_notification) {
 	}
 }
 
-bool Control::clips_input() const {
-	if (get_script_instance()) {
-		return get_script_instance()->call(SceneStringNames::get_singleton()->_clips_input);
-	}
-	return false;
-}
-
 bool Control::has_point(const Point2 &p_point) const {
-	if (get_script_instance()) {
-		Variant v = p_point;
-		const Variant *p = &v;
-		Callable::CallError ce;
-		Variant ret = get_script_instance()->call(SceneStringNames::get_singleton()->_has_point, &p, 1, ce);
-		if (ce.error == Callable::CallError::CALL_OK) {
-			return ret;
-		}
+	bool ret;
+	if (GDVIRTUAL_CALL(_has_point, p_point, ret)) {
+		return ret;
 	}
-	/*if (has_stylebox("mask")) {
-		Ref<StyleBox> mask = get_stylebox("mask");
-		return mask->test_mask(p_point,Rect2(Point2(),get_size()));
-	}*/
 	return Rect2(Point2(), get_size()).has_point(p_point);
 }
 
@@ -1084,7 +1068,7 @@ Rect2 Control::get_parent_anchorable_rect() const {
 	} else {
 #ifdef TOOLS_ENABLED
 		Node *edited_root = get_tree()->get_edited_scene_root();
-		if (edited_root && (this == edited_root || edited_root->is_a_parent_of(this))) {
+		if (edited_root && (this == edited_root || edited_root->is_ancestor_of(this))) {
 			parent_rect.size = Size2(ProjectSettings::get_singleton()->get("display/window/size/width"), ProjectSettings::get_singleton()->get("display/window/size/height"));
 		} else {
 			parent_rect = get_viewport()->get_visible_rect();
@@ -1504,7 +1488,7 @@ Point2 Control::get_global_position() const {
 
 Point2 Control::get_screen_position() const {
 	ERR_FAIL_COND_V(!is_inside_tree(), Point2());
-	Point2 global_pos = get_global_position();
+	Point2 global_pos = get_viewport()->get_canvas_transform().xform(get_global_position());
 	Window *w = Object::cast_to<Window>(get_viewport());
 	if (w && !w->is_embedding_subwindows()) {
 		global_pos += w->get_position();
@@ -2473,14 +2457,6 @@ real_t Control::get_rotation() const {
 	return data.rotation;
 }
 
-void Control::set_rotation_degrees(real_t p_degrees) {
-	set_rotation(Math::deg2rad(p_degrees));
-}
-
-real_t Control::get_rotation_degrees() const {
-	return Math::rad2deg(get_rotation());
-}
-
 void Control::_override_changed() {
 	notification(NOTIFICATION_THEME_CHANGED);
 	emit_signal(SceneStringNames::get_singleton()->theme_changed);
@@ -2648,7 +2624,6 @@ void Control::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_global_position", "position", "keep_offsets"), &Control::set_global_position, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("_set_global_position", "position"), &Control::_set_global_position);
 	ClassDB::bind_method(D_METHOD("set_rotation", "radians"), &Control::set_rotation);
-	ClassDB::bind_method(D_METHOD("set_rotation_degrees", "degrees"), &Control::set_rotation_degrees);
 	ClassDB::bind_method(D_METHOD("set_scale", "scale"), &Control::set_scale);
 	ClassDB::bind_method(D_METHOD("set_pivot_offset", "pivot_offset"), &Control::set_pivot_offset);
 	ClassDB::bind_method(D_METHOD("get_offset", "offset"), &Control::get_offset);
@@ -2657,7 +2632,6 @@ void Control::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_position"), &Control::get_position);
 	ClassDB::bind_method(D_METHOD("get_size"), &Control::get_size);
 	ClassDB::bind_method(D_METHOD("get_rotation"), &Control::get_rotation);
-	ClassDB::bind_method(D_METHOD("get_rotation_degrees"), &Control::get_rotation_degrees);
 	ClassDB::bind_method(D_METHOD("get_scale"), &Control::get_scale);
 	ClassDB::bind_method(D_METHOD("get_pivot_offset"), &Control::get_pivot_offset);
 	ClassDB::bind_method(D_METHOD("get_custom_minimum_size"), &Control::get_custom_minimum_size);
@@ -2784,7 +2758,6 @@ void Control::_bind_methods() {
 	BIND_VMETHOD(MethodInfo(
 			PropertyInfo(Variant::OBJECT, "control", PROPERTY_HINT_RESOURCE_TYPE, "Control"),
 			"_make_custom_tooltip", PropertyInfo(Variant::STRING, "for_text")));
-	BIND_VMETHOD(MethodInfo(Variant::BOOL, "_clips_input"));
 
 	ADD_GROUP("Anchor", "anchor_");
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "anchor_left", PROPERTY_HINT_RANGE, "0,1,0.001,or_lesser,or_greater"), "_set_anchor", "get_anchor", SIDE_LEFT);
@@ -2810,8 +2783,7 @@ void Control::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "rect_global_position", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "_set_global_position", "get_global_position");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "rect_size", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "_set_size", "get_size");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "rect_min_size"), "set_custom_minimum_size", "get_custom_minimum_size");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rect_rotation", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR), "set_rotation", "get_rotation");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rect_rotation_degrees", PROPERTY_HINT_RANGE, "-360,360,0.1,or_lesser,or_greater"), "set_rotation_degrees", "get_rotation_degrees");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rect_rotation", PROPERTY_HINT_RANGE, "-360,360,0.1,or_lesser,or_greater,radians"), "set_rotation", "get_rotation");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "rect_scale"), "set_scale", "get_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "rect_pivot_offset"), "set_pivot_offset", "get_pivot_offset");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "rect_clip_content"), "set_clip_contents", "is_clipping_contents");
@@ -2940,5 +2912,5 @@ void Control::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("minimum_size_changed"));
 	ADD_SIGNAL(MethodInfo("theme_changed"));
 
-	BIND_VMETHOD(MethodInfo(Variant::BOOL, "_has_point", PropertyInfo(Variant::VECTOR2, "point")));
+	GDVIRTUAL_BIND(_has_point);
 }

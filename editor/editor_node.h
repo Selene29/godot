@@ -194,6 +194,7 @@ private:
 		HELP_DOCS,
 		HELP_QA,
 		HELP_REPORT_A_BUG,
+		HELP_SUGGEST_A_FEATURE,
 		HELP_SEND_DOCS_FEEDBACK,
 		HELP_COMMUNITY,
 		HELP_ABOUT,
@@ -300,6 +301,7 @@ private:
 	ConfirmationDialog *save_confirmation;
 	ConfirmationDialog *import_confirmation;
 	ConfirmationDialog *pick_main_scene;
+	Button *select_current_scene_button;
 	AcceptDialog *accept;
 	EditorAbout *about;
 	AcceptDialog *warning;
@@ -661,6 +663,8 @@ private:
 	void _feature_profile_changed();
 	bool _is_class_editor_disabled_by_feature_profile(const StringName &p_class);
 	Ref<ImageTexture> _load_custom_class_icon(const String &p_path) const;
+
+	void _pick_main_scene_custom_action(const String &p_custom_action_name);
 
 protected:
 	void _notification(int p_what);

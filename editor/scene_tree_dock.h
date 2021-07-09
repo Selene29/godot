@@ -247,6 +247,9 @@ class SceneTreeDock : public VBoxContainer {
 	static SceneTreeDock *singleton;
 	static void _update_configuration_warning();
 
+	static bool _update_node_path(const NodePath &p_root_path, NodePath &r_node_path, List<Pair<NodePath, NodePath>> *p_renames);
+	static bool _check_node_path_recursive(const NodePath &p_root_path, Variant &r_variant, List<Pair<NodePath, NodePath>> *p_renames);
+
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
@@ -258,6 +261,7 @@ public:
 	void _focus_node();
 
 	void import_subscene();
+	void add_root_node(Node *p_node);
 	void set_edited_scene(Node *p_scene);
 	void instantiate(const String &p_file);
 	void instantiate_scenes(const Vector<String> &p_files, Node *p_parent = nullptr);

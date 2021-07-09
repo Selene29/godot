@@ -56,7 +56,6 @@ public:
 	virtual RID scenario_allocate() = 0;
 	virtual void scenario_initialize(RID p_rid) = 0;
 
-	virtual void scenario_set_debug(RID p_scenario, RS::ScenarioDebugMode p_debug_mode) = 0;
 	virtual void scenario_set_environment(RID p_scenario, RID p_environment) = 0;
 	virtual void scenario_set_camera_effects(RID p_scenario, RID p_fx) = 0;
 	virtual void scenario_set_fallback_environment(RID p_scenario, RID p_environment) = 0;
@@ -81,7 +80,6 @@ public:
 	virtual void instance_set_custom_aabb(RID p_instance, AABB p_aabb) = 0;
 
 	virtual void instance_attach_skeleton(RID p_instance, RID p_skeleton) = 0;
-	virtual void instance_set_exterior(RID p_instance, bool p_enabled) = 0;
 
 	virtual void instance_set_extra_visibility_margin(RID p_instance, real_t p_margin) = 0;
 	virtual void instance_set_visibility_parent(RID p_instance, RID p_parent_instance) = 0;
@@ -203,7 +201,12 @@ public:
 	virtual void sdfgi_set_debug_probe_select(const Vector3 &p_position, const Vector3 &p_dir) = 0;
 
 	virtual void render_empty_scene(RID p_render_buffers, RID p_scenario, RID p_shadow_atlas) = 0;
-	virtual void render_camera(RID p_render_buffers, RID p_camera, RID p_scenario, RID p_viewport, Size2 p_viewport_size, float p_lod_threshold, RID p_shadow_atlas, Ref<XRInterface> &p_xr_interface) = 0;
+
+	struct RenderInfo {
+		int info[RS::VIEWPORT_RENDER_INFO_TYPE_MAX][RS::VIEWPORT_RENDER_INFO_MAX] = {};
+	};
+
+	virtual void render_camera(RID p_render_buffers, RID p_camera, RID p_scenario, RID p_viewport, Size2 p_viewport_size, float p_lod_threshold, RID p_shadow_atlas, Ref<XRInterface> &p_xr_interface, RenderInfo *r_render_info = nullptr) = 0;
 
 	virtual void update() = 0;
 	virtual void render_probes() = 0;

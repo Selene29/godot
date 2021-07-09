@@ -103,7 +103,6 @@ SceneStringNames::SceneStringNames() {
 	_update_scroll = StaticCString::create("_update_scroll");
 	_update_xform = StaticCString::create("_update_xform");
 
-	_clips_input = StaticCString::create("_clips_input");
 	_structured_text_parser = StaticCString::create("_structured_text_parser");
 
 	_proxgroup_add = StaticCString::create("_proxgroup_add");
@@ -144,7 +143,7 @@ SceneStringNames::SceneStringNames() {
 	v_offset = StaticCString::create("v_offset");
 
 	transform_pos = StaticCString::create("position");
-	transform_rot = StaticCString::create("rotation_degrees");
+	transform_rot = StaticCString::create("rotation");
 	transform_scale = StaticCString::create("scale");
 
 	_update_remote = StaticCString::create("_update_remote");

@@ -77,7 +77,7 @@ RID Material::get_rid() const {
 
 void Material::_validate_property(PropertyInfo &property) const {
 	if (!_can_do_next_pass() && property.name == "next_pass") {
-		property.usage = 0;
+		property.usage = PROPERTY_USAGE_NONE;
 	}
 }
 
@@ -130,7 +130,7 @@ bool ShaderMaterial::_set(const StringName &p_name, const Variant &p_value) {
 			}
 		}
 		if (pr) {
-			RenderingServer::get_singleton()->material_set_param(_get_material(), pr, p_value);
+			set_shader_param(pr, p_value);
 			return true;
 		}
 	}
@@ -152,7 +152,12 @@ bool ShaderMaterial::_get(const StringName &p_name, Variant &r_ret) const {
 		}
 
 		if (pr) {
-			r_ret = RenderingServer::get_singleton()->material_get_param(_get_material(), pr);
+			const Map<StringName, Variant>::Element *E = param_cache.find(pr);
+			if (E) {
+				r_ret = E->get();
+			} else {
+				r_ret = Variant();
+			}
 			return true;
 		}
 	}
@@ -219,11 +224,31 @@ Ref<Shader> ShaderMaterial::get_shader() const {
 }
 
 void ShaderMaterial::set_shader_param(const StringName &p_param, const Variant &p_value) {
-	RS::get_singleton()->material_set_param(_get_material(), p_param, p_value);
+	if (p_value.get_type() == Variant::NIL) {
+		param_cache.erase(p_param);
+		RS::get_singleton()->material_set_param(_get_material(), p_param, Variant());
+	} else {
+		param_cache[p_param] = p_value;
+		if (p_value.get_type() == Variant::OBJECT) {
+			RID tex_rid = p_value;
+			if (tex_rid == RID()) {
+				param_cache.erase(p_param);
+				RS::get_singleton()->material_set_param(_get_material(), p_param, Variant());
+			} else {
+				RS::get_singleton()->material_set_param(_get_material(), p_param, tex_rid);
+			}
+		} else {
+			RS::get_singleton()->material_set_param(_get_material(), p_param, p_value);
+		}
+	}
 }
 
 Variant ShaderMaterial::get_shader_param(const StringName &p_param) const {
-	return RS::get_singleton()->material_get_param(_get_material(), p_param);
+	if (param_cache.has(p_param)) {
+		return param_cache[p_param];
+	} else {
+		return Variant();
+	}
 }
 
 void ShaderMaterial::_shader_changed() {
@@ -345,7 +370,6 @@ void BaseMaterial3D::init_shaders() {
 	shader_names->refraction_texture_channel = "refraction_texture_channel";
 
 	shader_names->transmittance_color = "transmittance_color";
-	shader_names->transmittance_curve = "transmittance_curve";
 	shader_names->transmittance_depth = "transmittance_depth";
 	shader_names->transmittance_boost = "transmittance_boost";
 
@@ -692,7 +716,6 @@ void BaseMaterial3D::_update_shader() {
 		code += "uniform vec4 transmittance_color : hint_color;\n";
 		code += "uniform float transmittance_depth;\n";
 		code += "uniform sampler2D texture_subsurface_transmittance : hint_white," + texfilter_str + ";\n";
-		code += "uniform float transmittance_curve;\n";
 		code += "uniform float transmittance_boost;\n";
 	}
 
@@ -822,9 +845,9 @@ void BaseMaterial3D::_update_shader() {
 		code += "\tTANGENT+= vec3(1.0,0.0,0.0) * abs(NORMAL.z);\n";
 		code += "\tTANGENT = normalize(TANGENT);\n";
 
-		code += "\tBINORMAL = vec3(0.0,-1.0,0.0) * abs(NORMAL.x);\n";
-		code += "\tBINORMAL+= vec3(0.0,0.0,1.0) * abs(NORMAL.y);\n";
-		code += "\tBINORMAL+= vec3(0.0,-1.0,0.0) * abs(NORMAL.z);\n";
+		code += "\tBINORMAL = vec3(0.0,1.0,0.0) * abs(NORMAL.x);\n";
+		code += "\tBINORMAL+= vec3(0.0,0.0,-1.0) * abs(NORMAL.y);\n";
+		code += "\tBINORMAL+= vec3(0.0,1.0,0.0) * abs(NORMAL.z);\n";
 		code += "\tBINORMAL = normalize(BINORMAL);\n";
 	}
 
@@ -876,6 +899,20 @@ void BaseMaterial3D::_update_shader() {
 
 	if ((features[FEATURE_DETAIL] && detail_uv == DETAIL_UV_2) || (features[FEATURE_AMBIENT_OCCLUSION] && flags[FLAG_AO_ON_UV2]) || (features[FEATURE_EMISSION] && flags[FLAG_EMISSION_ON_UV2])) {
 		code += "\tvec2 base_uv2 = UV2;\n";
+	}
+
+	if (features[FEATURE_HEIGHT_MAPPING] && flags[FLAG_UV1_USE_TRIPLANAR]) {
+		// Display both resource name and albedo texture name.
+		// Materials are often built-in to scenes, so displaying the resource name alone may not be meaningful.
+		// On the other hand, albedo textures are almost always external to the scene.
+		if (textures[TEXTURE_ALBEDO].is_valid()) {
+			WARN_PRINT(vformat("%s (albedo %s): Height mapping is not supported on triplanar materials. Ignoring height mapping in favor of triplanar mapping.", get_path(), textures[TEXTURE_ALBEDO]->get_path()));
+		} else if (!get_path().is_empty()) {
+			WARN_PRINT(vformat("%s: Height mapping is not supported on triplanar materials. Ignoring height mapping in favor of triplanar mapping.", get_path()));
+		} else {
+			// Resource wasn't saved yet.
+			WARN_PRINT("Height mapping is not supported on triplanar materials. Ignoring height mapping in favor of triplanar mapping.");
+		}
 	}
 
 	if (!RenderingServer::get_singleton()->is_low_end() && features[FEATURE_HEIGHT_MAPPING] && !flags[FLAG_UV1_USE_TRIPLANAR]) { //heightmap not supported with triplanar
@@ -987,9 +1024,9 @@ void BaseMaterial3D::_update_shader() {
 		code += "\tSPECULAR = specular;\n";
 	} else {
 		if (flags[FLAG_UV1_USE_TRIPLANAR]) {
-			code += "\tfloat orm_tex = triplanar_texture(texture_orm,uv1_power_normal,uv1_triplanar_pos);\n";
+			code += "\tvec4 orm_tex = triplanar_texture(texture_orm,uv1_power_normal,uv1_triplanar_pos);\n";
 		} else {
-			code += "\tfloat orm_tex = texture(texture_orm,base_uv);\n";
+			code += "\tvec4 orm_tex = texture(texture_orm,base_uv);\n";
 		}
 
 		code += "\tROUGHNESS = orm_tex.g;\n";
@@ -1180,7 +1217,6 @@ void BaseMaterial3D::_update_shader() {
 		code += "\tSSS_TRANSMITTANCE_COLOR=transmittance_color*trans_color_tex;\n";
 
 		code += "\tSSS_TRANSMITTANCE_DEPTH=transmittance_depth;\n";
-		code += "\tSSS_TRANSMITTANCE_CURVE=transmittance_curve;\n";
 		code += "\tSSS_TRANSMITTANCE_BOOST=transmittance_boost;\n";
 	}
 
@@ -1422,15 +1458,6 @@ void BaseMaterial3D::set_transmittance_depth(float p_depth) {
 
 float BaseMaterial3D::get_transmittance_depth() const {
 	return transmittance_depth;
-}
-
-void BaseMaterial3D::set_transmittance_curve(float p_curve) {
-	transmittance_curve = p_curve;
-	RS::get_singleton()->material_set_param(_get_material(), shader_names->transmittance_curve, p_curve);
-}
-
-float BaseMaterial3D::get_transmittance_curve() const {
-	return transmittance_curve;
 }
 
 void BaseMaterial3D::set_transmittance_boost(float p_boost) {
@@ -1696,7 +1723,7 @@ void BaseMaterial3D::_validate_property(PropertyInfo &property) const {
 	_validate_high_end("heightmap", property);
 
 	if (property.name.begins_with("particles_anim_") && billboard_mode != BILLBOARD_PARTICLES) {
-		property.usage = 0;
+		property.usage = PROPERTY_USAGE_NONE;
 	}
 
 	if (property.name == "billboard_keep_scale" && billboard_mode == BILLBOARD_DISABLED) {
@@ -1726,33 +1753,33 @@ void BaseMaterial3D::_validate_property(PropertyInfo &property) const {
 
 	// alpha scissor slider isn't needed when alpha antialiasing is enabled
 	if (property.name == "alpha_scissor_threshold" && transparency != TRANSPARENCY_ALPHA_SCISSOR) {
-		property.usage = 0;
+		property.usage = PROPERTY_USAGE_NONE;
 	}
 
 	// alpha hash scale slider is only needed if transparency is alpha hash
 	if (property.name == "alpha_hash_scale" && transparency != TRANSPARENCY_ALPHA_HASH) {
-		property.usage = 0;
+		property.usage = PROPERTY_USAGE_NONE;
 	}
 
 	if (property.name == "alpha_antialiasing_mode" && !can_select_aa) {
-		property.usage = 0;
+		property.usage = PROPERTY_USAGE_NONE;
 	}
 
 	// we can't choose an antialiasing mode if alpha isn't possible
 	if (property.name == "alpha_antialiasing_edge" && !alpha_aa_enabled) {
-		property.usage = 0;
+		property.usage = PROPERTY_USAGE_NONE;
 	}
 
 	if (property.name == "blend_mode" && alpha_aa_enabled) {
-		property.usage = 0;
+		property.usage = PROPERTY_USAGE_NONE;
 	}
 
 	if ((property.name == "heightmap_min_layers" || property.name == "heightmap_max_layers") && !deep_parallax) {
-		property.usage = 0;
+		property.usage = PROPERTY_USAGE_NONE;
 	}
 
-	if (flags[FLAG_SUBSURFACE_MODE_SKIN] && (property.name == "subsurf_scatter_transmittance_color" || property.name == "subsurf_scatter_transmittance_texture" || property.name == "subsurf_scatter_transmittance_curve")) {
-		property.usage = 0;
+	if (flags[FLAG_SUBSURFACE_MODE_SKIN] && (property.name == "subsurf_scatter_transmittance_color" || property.name == "subsurf_scatter_transmittance_texture")) {
+		property.usage = PROPERTY_USAGE_NONE;
 	}
 
 	if (orm) {
@@ -1761,12 +1788,12 @@ void BaseMaterial3D::_validate_property(PropertyInfo &property) const {
 			property.hint_string = "Unshaded,Per-Pixel";
 		}
 		if (property.name.begins_with("roughness") || property.name.begins_with("metallic") || property.name.begins_with("ao_texture")) {
-			property.usage = 0;
+			property.usage = PROPERTY_USAGE_NONE;
 		}
 
 	} else {
 		if (property.name == "orm_texture") {
-			property.usage = 0;
+			property.usage = PROPERTY_USAGE_NONE;
 		}
 	}
 
@@ -1774,47 +1801,47 @@ void BaseMaterial3D::_validate_property(PropertyInfo &property) const {
 		if (shading_mode != SHADING_MODE_PER_VERTEX) {
 			//these may still work per vertex
 			if (property.name.begins_with("ao")) {
-				property.usage = 0;
+				property.usage = PROPERTY_USAGE_NONE;
 			}
 			if (property.name.begins_with("emission")) {
-				property.usage = 0;
+				property.usage = PROPERTY_USAGE_NONE;
 			}
 
 			if (property.name.begins_with("metallic")) {
-				property.usage = 0;
+				property.usage = PROPERTY_USAGE_NONE;
 			}
 			if (property.name.begins_with("rim")) {
-				property.usage = 0;
+				property.usage = PROPERTY_USAGE_NONE;
 			}
 
 			if (property.name.begins_with("roughness")) {
-				property.usage = 0;
+				property.usage = PROPERTY_USAGE_NONE;
 			}
 
 			if (property.name.begins_with("subsurf_scatter")) {
-				property.usage = 0;
+				property.usage = PROPERTY_USAGE_NONE;
 			}
 		}
 
 		//these definitely only need per pixel
 		if (property.name.begins_with("anisotropy")) {
-			property.usage = 0;
+			property.usage = PROPERTY_USAGE_NONE;
 		}
 
 		if (property.name.begins_with("clearcoat")) {
-			property.usage = 0;
+			property.usage = PROPERTY_USAGE_NONE;
 		}
 
 		if (property.name.begins_with("normal")) {
-			property.usage = 0;
+			property.usage = PROPERTY_USAGE_NONE;
 		}
 
 		if (property.name.begins_with("backlight")) {
-			property.usage = 0;
+			property.usage = PROPERTY_USAGE_NONE;
 		}
 
 		if (property.name.begins_with("transmittance")) {
-			property.usage = 0;
+			property.usage = PROPERTY_USAGE_NONE;
 		}
 	}
 }
@@ -2063,7 +2090,7 @@ BaseMaterial3D::TextureChannel BaseMaterial3D::get_refraction_texture_channel() 
 	return refraction_texture_channel;
 }
 
-RID BaseMaterial3D::get_material_rid_for_2d(bool p_shaded, bool p_transparent, bool p_double_sided, bool p_cut_alpha, bool p_opaque_prepass, bool p_billboard, bool p_billboard_y) {
+Ref<Material> BaseMaterial3D::get_material_for_2d(bool p_shaded, bool p_transparent, bool p_double_sided, bool p_cut_alpha, bool p_opaque_prepass, bool p_billboard, bool p_billboard_y, RID *r_shader_rid) {
 	int version = 0;
 	if (p_shaded) {
 		version = 1;
@@ -2088,7 +2115,10 @@ RID BaseMaterial3D::get_material_rid_for_2d(bool p_shaded, bool p_transparent, b
 	}
 
 	if (materials_for_2d[version].is_valid()) {
-		return materials_for_2d[version]->get_rid();
+		if (r_shader_rid) {
+			*r_shader_rid = materials_for_2d[version]->get_shader_rid();
+		}
+		return materials_for_2d[version];
 	}
 
 	Ref<StandardMaterial3D> material;
@@ -2106,7 +2136,11 @@ RID BaseMaterial3D::get_material_rid_for_2d(bool p_shaded, bool p_transparent, b
 
 	materials_for_2d[version] = material;
 
-	return materials_for_2d[version]->get_rid();
+	if (r_shader_rid) {
+		*r_shader_rid = materials_for_2d[version]->get_shader_rid();
+	}
+
+	return materials_for_2d[version];
 }
 
 void BaseMaterial3D::set_on_top_of_alpha() {
@@ -2175,6 +2209,8 @@ BaseMaterial3D::EmissionOperator BaseMaterial3D::get_emission_operator() const {
 }
 
 RID BaseMaterial3D::get_shader_rid() const {
+	MutexLock lock(material_mutex);
+	((BaseMaterial3D *)this)->_update_shader();
 	ERR_FAIL_COND_V(!shader_map.has(current_key), RID());
 	return shader_map[current_key].shader;
 }
@@ -2245,9 +2281,6 @@ void BaseMaterial3D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_transmittance_depth", "depth"), &BaseMaterial3D::set_transmittance_depth);
 	ClassDB::bind_method(D_METHOD("get_transmittance_depth"), &BaseMaterial3D::get_transmittance_depth);
-
-	ClassDB::bind_method(D_METHOD("set_transmittance_curve", "curve"), &BaseMaterial3D::set_transmittance_curve);
-	ClassDB::bind_method(D_METHOD("get_transmittance_curve"), &BaseMaterial3D::get_transmittance_curve);
 
 	ClassDB::bind_method(D_METHOD("set_transmittance_boost", "boost"), &BaseMaterial3D::set_transmittance_boost);
 	ClassDB::bind_method(D_METHOD("get_transmittance_boost"), &BaseMaterial3D::get_transmittance_boost);
@@ -2483,7 +2516,6 @@ void BaseMaterial3D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "subsurf_scatter_transmittance_color"), "set_transmittance_color", "get_transmittance_color");
 	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "subsurf_scatter_transmittance_texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D"), "set_texture", "get_texture", TEXTURE_SUBSURFACE_TRANSMITTANCE);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "subsurf_scatter_transmittance_depth", PROPERTY_HINT_RANGE, "0.001,8,0.001,or_greater"), "set_transmittance_depth", "get_transmittance_depth");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "subsurf_scatter_transmittance_curve", PROPERTY_HINT_EXP_EASING, "0.01,16,0.01"), "set_transmittance_curve", "get_transmittance_curve");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "subsurf_scatter_transmittance_boost", PROPERTY_HINT_RANGE, "0.00,1.0,0.01"), "set_transmittance_boost", "get_transmittance_boost");
 
 	ADD_GROUP("Back Lighting", "backlight_");
@@ -2700,7 +2732,6 @@ BaseMaterial3D::BaseMaterial3D(bool p_orm) :
 	set_backlight(Color(0, 0, 0));
 	set_transmittance_color(Color(1, 1, 1, 1));
 	set_transmittance_depth(0.1);
-	set_transmittance_curve(1.0);
 	set_transmittance_boost(0.0);
 	set_refraction(0.05);
 	set_point_size(1);

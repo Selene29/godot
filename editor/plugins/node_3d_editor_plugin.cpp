@@ -1967,6 +1967,13 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 			return;
 		}
 
+		if (EditorSettings::get_singleton()->get("editors/3d/navigation/emulate_numpad")) {
+			const uint32_t code = k->get_keycode();
+			if (code >= KEY_0 && code <= KEY_9) {
+				k->set_keycode(code - KEY_0 + KEY_KP_0);
+			}
+		}
+
 		if (ED_IS_SHORTCUT("spatial_editor/snap", p_event)) {
 			if (_edit.mode != TRANSFORM_NONE) {
 				_edit.snap = !_edit.snap;
@@ -2504,25 +2511,21 @@ void Node3DEditorViewport::_notification(int p_what) {
 		}
 
 		if (show_info) {
+			const String viewport_size = vformat(String::utf8("%d × %d"), viewport->get_size().x, viewport->get_size().y);
 			String text;
-			text += "X: " + rtos(current_camera->get_position().x).pad_decimals(1) + "\n";
-			text += "Y: " + rtos(current_camera->get_position().y).pad_decimals(1) + "\n";
-			text += "Z: " + rtos(current_camera->get_position().z).pad_decimals(1) + "\n";
-			text += TTR("Pitch") + ": " + itos(Math::round(current_camera->get_rotation_degrees().x)) + "\n";
-			text += TTR("Yaw") + ": " + itos(Math::round(current_camera->get_rotation_degrees().y)) + "\n\n";
+			text += vformat(TTR("X: %s\n"), rtos(current_camera->get_position().x).pad_decimals(1));
+			text += vformat(TTR("Y: %s\n"), rtos(current_camera->get_position().y).pad_decimals(1));
+			text += vformat(TTR("Z: %s\n"), rtos(current_camera->get_position().z).pad_decimals(1));
+			text += "\n";
+			text += vformat(
+					TTR("Size: %s (%.1fMP)\n"),
+					viewport_size,
+					viewport->get_size().x * viewport->get_size().y * 0.000001);
 
-			text += TTR("Size") +
-					vformat(
-							": %dx%d (%.1fMP)\n",
-							viewport->get_size().x,
-							viewport->get_size().y,
-							viewport->get_size().x * viewport->get_size().y * 0.000'001);
-			text += TTR("Objects Drawn") + ": " + itos(viewport->get_render_info(Viewport::RENDER_INFO_OBJECTS_IN_FRAME)) + "\n";
-			text += TTR("Material Changes") + ": " + itos(viewport->get_render_info(Viewport::RENDER_INFO_MATERIAL_CHANGES_IN_FRAME)) + "\n";
-			text += TTR("Shader Changes") + ": " + itos(viewport->get_render_info(Viewport::RENDER_INFO_SHADER_CHANGES_IN_FRAME)) + "\n";
-			text += TTR("Surface Changes") + ": " + itos(viewport->get_render_info(Viewport::RENDER_INFO_SURFACE_CHANGES_IN_FRAME)) + "\n";
-			text += TTR("Draw Calls") + ": " + itos(viewport->get_render_info(Viewport::RENDER_INFO_DRAW_CALLS_IN_FRAME)) + "\n";
-			text += TTR("Vertices") + ": " + itos(viewport->get_render_info(Viewport::RENDER_INFO_VERTICES_IN_FRAME));
+			text += "\n";
+			text += vformat(TTR("Objects: %d\n"), viewport->get_render_info(Viewport::RENDER_INFO_TYPE_VISIBLE, Viewport::RENDER_INFO_OBJECTS_IN_FRAME));
+			text += vformat(TTR("Primitives: %d\n"), viewport->get_render_info(Viewport::RENDER_INFO_TYPE_VISIBLE, Viewport::RENDER_INFO_PRIMITIVES_IN_FRAME));
+			text += vformat(TTR("Draw Calls: %d"), viewport->get_render_info(Viewport::RENDER_INFO_TYPE_VISIBLE, Viewport::RENDER_INFO_DRAW_CALLS_IN_FRAME));
 
 			info_label->set_text(text);
 		}
@@ -3254,14 +3257,12 @@ void Node3DEditorViewport::_toggle_camera_preview(bool p_activate) {
 		if (!preview) {
 			preview_camera->hide();
 		}
-		view_menu->set_disabled(false);
 		surface->update();
 
 	} else {
 		previewing = preview;
 		previewing->connect("tree_exiting", callable_mp(this, &Node3DEditorViewport::_preview_exited_scene));
 		RS::get_singleton()->viewport_attach_camera(viewport->get_viewport_rid(), preview->get_camera()); //replace
-		view_menu->set_disabled(true);
 		surface->update();
 	}
 }
@@ -3508,7 +3509,6 @@ void Node3DEditorViewport::set_state(const Dictionary &p_state) {
 			previewing = Object::cast_to<Camera3D>(pv);
 			previewing->connect("tree_exiting", callable_mp(this, &Node3DEditorViewport::_preview_exited_scene));
 			RS::get_singleton()->viewport_attach_camera(viewport->get_viewport_rid(), previewing->get_camera()); //replace
-			view_menu->set_disabled(true);
 			surface->update();
 			preview_camera->set_pressed(true);
 			preview_camera->show();
@@ -6223,8 +6223,9 @@ void Node3DEditor::_add_sun_to_scene() {
 
 	Node *base = get_tree()->get_edited_scene_root();
 	if (!base) {
-		EditorNode::get_singleton()->show_warning(TTR("A root node is needed for this operation"));
-		return;
+		// Create a root node so we can add child nodes to it.
+		EditorNode::get_singleton()->get_scene_tree_dock()->add_root_node(memnew(Node3D));
+		base = get_tree()->get_edited_scene_root();
 	}
 	ERR_FAIL_COND(!base);
 	Node *new_sun = preview_sun->duplicate();
@@ -6241,8 +6242,9 @@ void Node3DEditor::_add_environment_to_scene() {
 
 	Node *base = get_tree()->get_edited_scene_root();
 	if (!base) {
-		EditorNode::get_singleton()->show_warning(TTR("A root node is needed for this operation"));
-		return;
+		// Create a root node so we can add child nodes to it.
+		EditorNode::get_singleton()->get_scene_tree_dock()->add_root_node(memnew(Node3D));
+		base = get_tree()->get_edited_scene_root();
 	}
 	ERR_FAIL_COND(!base);
 
@@ -6373,7 +6375,7 @@ void Node3DEditor::_request_gizmo(Object *p_obj) {
 	if (!sp) {
 		return;
 	}
-	if (editor->get_edited_scene() && (sp == editor->get_edited_scene() || (sp->get_owner() && editor->get_edited_scene()->is_a_parent_of(sp)))) {
+	if (editor->get_edited_scene() && (sp == editor->get_edited_scene() || (sp->get_owner() && editor->get_edited_scene()->is_ancestor_of(sp)))) {
 		Ref<EditorNode3DGizmo> seg;
 
 		for (int i = 0; i < gizmo_plugins_by_priority.size(); ++i) {
@@ -6447,7 +6449,7 @@ void Node3DEditor::_toggle_maximize_view(Object *p_viewport) {
 }
 
 void Node3DEditor::_node_added(Node *p_node) {
-	if (EditorNode::get_singleton()->get_scene_root()->is_a_parent_of(p_node)) {
+	if (EditorNode::get_singleton()->get_scene_root()->is_ancestor_of(p_node)) {
 		if (Object::cast_to<WorldEnvironment>(p_node)) {
 			world_env_count++;
 			if (world_env_count == 1) {
@@ -6463,7 +6465,7 @@ void Node3DEditor::_node_added(Node *p_node) {
 }
 
 void Node3DEditor::_node_removed(Node *p_node) {
-	if (EditorNode::get_singleton()->get_scene_root()->is_a_parent_of(p_node)) {
+	if (EditorNode::get_singleton()->get_scene_root()->is_ancestor_of(p_node)) {
 		if (Object::cast_to<WorldEnvironment>(p_node)) {
 			world_env_count--;
 			if (world_env_count == 0) {
@@ -6778,6 +6780,8 @@ Node3DEditor::Node3DEditor(EditorNode *p_editor) {
 	button_binds.write[0] = MENU_LOCK_SELECTED;
 	tool_button[TOOL_LOCK_SELECTED]->connect("pressed", callable_mp(this, &Node3DEditor::_menu_item_pressed), button_binds);
 	tool_button[TOOL_LOCK_SELECTED]->set_tooltip(TTR("Lock the selected object in place (can't be moved)."));
+	// Define the shortcut globally (without a context) so that it works if the Scene tree dock is currently focused.
+	tool_button[TOOL_LOCK_SELECTED]->set_shortcut(ED_SHORTCUT("editor/lock_selected_nodes", TTR("Lock Selected Node(s)"), KEY_MASK_CMD | KEY_L));
 
 	tool_button[TOOL_UNLOCK_SELECTED] = memnew(Button);
 	hbc_menu->add_child(tool_button[TOOL_UNLOCK_SELECTED]);
@@ -6785,6 +6789,8 @@ Node3DEditor::Node3DEditor(EditorNode *p_editor) {
 	button_binds.write[0] = MENU_UNLOCK_SELECTED;
 	tool_button[TOOL_UNLOCK_SELECTED]->connect("pressed", callable_mp(this, &Node3DEditor::_menu_item_pressed), button_binds);
 	tool_button[TOOL_UNLOCK_SELECTED]->set_tooltip(TTR("Unlock the selected object (can be moved)."));
+	// Define the shortcut globally (without a context) so that it works if the Scene tree dock is currently focused.
+	tool_button[TOOL_UNLOCK_SELECTED]->set_shortcut(ED_SHORTCUT("editor/unlock_selected_nodes", TTR("Unlock Selected Node(s)"), KEY_MASK_CMD | KEY_MASK_SHIFT | KEY_L));
 
 	tool_button[TOOL_GROUP_SELECTED] = memnew(Button);
 	hbc_menu->add_child(tool_button[TOOL_GROUP_SELECTED]);
@@ -6792,6 +6798,8 @@ Node3DEditor::Node3DEditor(EditorNode *p_editor) {
 	button_binds.write[0] = MENU_GROUP_SELECTED;
 	tool_button[TOOL_GROUP_SELECTED]->connect("pressed", callable_mp(this, &Node3DEditor::_menu_item_pressed), button_binds);
 	tool_button[TOOL_GROUP_SELECTED]->set_tooltip(TTR("Makes sure the object's children are not selectable."));
+	// Define the shortcut globally (without a context) so that it works if the Scene tree dock is currently focused.
+	tool_button[TOOL_GROUP_SELECTED]->set_shortcut(ED_SHORTCUT("editor/group_selected_nodes", TTR("Group Selected Node(s)"), KEY_MASK_CMD | KEY_G));
 
 	tool_button[TOOL_UNGROUP_SELECTED] = memnew(Button);
 	hbc_menu->add_child(tool_button[TOOL_UNGROUP_SELECTED]);
@@ -6799,6 +6807,8 @@ Node3DEditor::Node3DEditor(EditorNode *p_editor) {
 	button_binds.write[0] = MENU_UNGROUP_SELECTED;
 	tool_button[TOOL_UNGROUP_SELECTED]->connect("pressed", callable_mp(this, &Node3DEditor::_menu_item_pressed), button_binds);
 	tool_button[TOOL_UNGROUP_SELECTED]->set_tooltip(TTR("Restores the object's children's ability to be selected."));
+	// Define the shortcut globally (without a context) so that it works if the Scene tree dock is currently focused.
+	tool_button[TOOL_UNGROUP_SELECTED]->set_shortcut(ED_SHORTCUT("editor/ungroup_selected_nodes", TTR("Ungroup Selected Node(s)"), KEY_MASK_CMD | KEY_MASK_SHIFT | KEY_G));
 
 	hbc_menu->add_child(memnew(VSeparator));
 
@@ -6917,7 +6927,7 @@ Node3DEditor::Node3DEditor(EditorNode *p_editor) {
 
 	p->add_separator();
 	p->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_origin", TTR("View Origin")), MENU_VIEW_ORIGIN);
-	p->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_grid", TTR("View Grid")), MENU_VIEW_GRID);
+	p->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_grid", TTR("View Grid"), KEY_NUMBERSIGN), MENU_VIEW_GRID);
 
 	p->add_separator();
 	p->add_shortcut(ED_SHORTCUT("spatial_editor/settings", TTR("Settings...")), MENU_VIEW_CAMERA_SETTINGS);
@@ -7072,8 +7082,6 @@ Node3DEditor::Node3DEditor(EditorNode *p_editor) {
 	xform_vbc->add_child(xform_type);
 
 	xform_dialog->connect("confirmed", callable_mp(this, &Node3DEditor::_xform_dialog_action));
-
-	scenario_debug = RenderingServer::SCENARIO_DEBUG_DISABLED;
 
 	selected = nullptr;
 

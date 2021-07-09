@@ -912,73 +912,135 @@ PropertyInfo VisualScriptOperator::get_output_value_port_info(int p_idx) const {
 	return pinfo;
 }
 
-static const char *op_names[] = {
-	//comparison
-	"Are Equal", //OP_EQUAL,
-	"Are Not Equal", //OP_NOT_EQUAL,
-	"Less Than", //OP_LESS,
-	"Less Than or Equal", //OP_LESS_EQUAL,
-	"Greater Than", //OP_GREATER,
-	"Greater Than or Equal", //OP_GREATER_EQUAL,
-	//mathematic
-	"Add", //OP_ADD,
-	"Subtract", //OP_SUBTRACT,
-	"Multiply", //OP_MULTIPLY,
-	"Divide", //OP_DIVIDE,
-	"Negate", //OP_NEGATE,
-	"Positive", //OP_POSITIVE,
-	"Remainder", //OP_MODULE,
-	"Concatenate", //OP_STRING_CONCAT,
-	//bitwise
-	"Bit Shift Left", //OP_SHIFT_LEFT,
-	"Bit Shift Right", //OP_SHIFT_RIGHT,
-	"Bit And", //OP_BIT_AND,
-	"Bit Or", //OP_BIT_OR,
-	"Bit Xor", //OP_BIT_XOR,
-	"Bit Negate", //OP_BIT_NEGATE,
-	//logic
-	"And", //OP_AND,
-	"Or", //OP_OR,
-	"Xor", //OP_XOR,
-	"Not", //OP_NOT,
-	//containment
-	"In", //OP_IN,
-};
-
 String VisualScriptOperator::get_caption() const {
-	static const char32_t *op_names[] = {
-		//comparison
-		U"A = B", //OP_EQUAL,
-		U"A \u2260 B", //OP_NOT_EQUAL,
-		U"A < B", //OP_LESS,
-		U"A \u2264 B", //OP_LESS_EQUAL,
-		U"A > B", //OP_GREATER,
-		U"A \u2265 B", //OP_GREATER_EQUAL,
-		//mathematic
-		U"A + B", //OP_ADD,
-		U"A - B", //OP_SUBTRACT,
-		U"A \u00D7 B", //OP_MULTIPLY,
-		U"A \u00F7 B", //OP_DIVIDE,
-		U"\u00AC A", //OP_NEGATE,
-		U"+ A", //OP_POSITIVE,
-		U"A mod B", //OP_MODULE,
-		U"A .. B", //OP_STRING_CONCAT,
-		//bitwise
-		U"A << B", //OP_SHIFT_LEFT,
-		U"A >> B", //OP_SHIFT_RIGHT,
-		U"A & B", //OP_BIT_AND,
-		U"A | B", //OP_BIT_OR,
-		U"A ^ B", //OP_BIT_XOR,
-		U"~A", //OP_BIT_NEGATE,
-		//logic
-		U"A and B", //OP_AND,
-		U"A or B", //OP_OR,
-		U"A xor B", //OP_XOR,
-		U"not A", //OP_NOT,
-		U"A in B", //OP_IN,
+	switch (op) {
+		// comparison
+		case Variant::OP_EQUAL:
+			return U"A = B";
+		case Variant::OP_NOT_EQUAL:
+			return U"A \u2260 B";
+		case Variant::OP_LESS:
+			return U"A < B";
+		case Variant::OP_LESS_EQUAL:
+			return U"A \u2264 B";
+		case Variant::OP_GREATER:
+			return U"A > B";
+		case Variant::OP_GREATER_EQUAL:
+			return U"A \u2265 B";
 
-	};
-	return op_names[op];
+		// mathematic
+		case Variant::OP_ADD:
+			return U"A + B";
+		case Variant::OP_SUBTRACT:
+			return U"A - B";
+		case Variant::OP_MULTIPLY:
+			return U"A \u00D7 B";
+		case Variant::OP_DIVIDE:
+			return U"A \u00F7 B";
+		case Variant::OP_NEGATE:
+			return U"\u00AC A";
+		case Variant::OP_POSITIVE:
+			return U"+ A";
+		case Variant::OP_MODULE:
+			return U"A mod B";
+
+		// bitwise
+		case Variant::OP_SHIFT_LEFT:
+			return U"A << B";
+		case Variant::OP_SHIFT_RIGHT:
+			return U"A >> B";
+		case Variant::OP_BIT_AND:
+			return U"A & B";
+		case Variant::OP_BIT_OR:
+			return U"A | B";
+		case Variant::OP_BIT_XOR:
+			return U"A ^ B";
+		case Variant::OP_BIT_NEGATE:
+			return U"~A";
+
+		// logic
+		case Variant::OP_AND:
+			return U"A and B";
+		case Variant::OP_OR:
+			return U"A or B";
+		case Variant::OP_XOR:
+			return U"A xor B";
+		case Variant::OP_NOT:
+			return U"not A";
+		case Variant::OP_IN:
+			return U"A in B";
+
+		default: {
+			ERR_FAIL_V_MSG(
+					U"Unknown node",
+					U"Unknown node type encountered, caption not available.");
+		}
+	}
+}
+
+String VisualScriptOperator::get_operator_name(Variant::Operator p_op) {
+	switch (p_op) {
+		// comparison
+		case Variant::OP_EQUAL:
+			return "Are Equal";
+		case Variant::OP_NOT_EQUAL:
+			return "Are Not Equal";
+		case Variant::OP_LESS:
+			return "Less Than";
+		case Variant::OP_LESS_EQUAL:
+			return "Less Than or Equal";
+		case Variant::OP_GREATER:
+			return "Greater Than";
+		case Variant::OP_GREATER_EQUAL:
+			return "Greater Than or Equal";
+
+		// mathematic
+		case Variant::OP_ADD:
+			return "Add";
+		case Variant::OP_SUBTRACT:
+			return "Subtract";
+		case Variant::OP_MULTIPLY:
+			return "Multiply";
+		case Variant::OP_DIVIDE:
+			return "Divide";
+		case Variant::OP_NEGATE:
+			return "Negate";
+		case Variant::OP_POSITIVE:
+			return "Positive";
+		case Variant::OP_MODULE:
+			return "Remainder";
+
+		// bitwise
+		case Variant::OP_SHIFT_LEFT:
+			return "Bit Shift Left";
+		case Variant::OP_SHIFT_RIGHT:
+			return "Bit Shift Right";
+		case Variant::OP_BIT_AND:
+			return "Bit And";
+		case Variant::OP_BIT_OR:
+			return "Bit Or";
+		case Variant::OP_BIT_XOR:
+			return "Bit Xor";
+		case Variant::OP_BIT_NEGATE:
+			return "Bit Negate";
+
+		// logic
+		case Variant::OP_AND:
+			return "And";
+		case Variant::OP_OR:
+			return "Or";
+		case Variant::OP_XOR:
+			return "Xor";
+		case Variant::OP_NOT:
+			return "Not";
+		case Variant::OP_IN:
+			return "In";
+
+		default: {
+			ERR_FAIL_INDEX_V(p_op, Variant::OP_MAX, "");
+			return "Unknown Operator";
+		}
+	}
 }
 
 void VisualScriptOperator::set_operator(Variant::Operator p_op) {
@@ -1018,7 +1080,7 @@ void VisualScriptOperator::_bind_methods() {
 		if (i > 0) {
 			types += ",";
 		}
-		types += op_names[i];
+		types += get_operator_name(static_cast<Variant::Operator>(i));
 	}
 
 	String argt = "Any";
@@ -1051,9 +1113,9 @@ public:
 				r_error_str = *p_outputs[0];
 			} else {
 				if (unary) {
-					r_error_str = String(op_names[op]) + RTR(": Invalid argument of type: ") + Variant::get_type_name(p_inputs[0]->get_type());
+					r_error_str = String(Variant::get_operator_name(op)) + RTR(": Invalid argument of type: ") + Variant::get_type_name(p_inputs[0]->get_type());
 				} else {
-					r_error_str = String(op_names[op]) + RTR(": Invalid arguments: ") + "A: " + Variant::get_type_name(p_inputs[0]->get_type()) + "  B: " + Variant::get_type_name(p_inputs[1]->get_type());
+					r_error_str = String(Variant::get_operator_name(op)) + RTR(": Invalid arguments: ") + "A: " + Variant::get_type_name(p_inputs[0]->get_type()) + "  B: " + Variant::get_type_name(p_inputs[1]->get_type());
 				}
 			}
 		}
@@ -1472,7 +1534,7 @@ void VisualScriptConstant::_validate_property(PropertyInfo &property) const {
 	if (property.name == "value") {
 		property.type = type;
 		if (type == Variant::NIL) {
-			property.usage = 0; //do not save if nil
+			property.usage = PROPERTY_USAGE_NONE; //do not save if nil
 		}
 	}
 }
@@ -2062,7 +2124,7 @@ void VisualScriptBasicTypeConstant::_validate_property(PropertyInfo &property) c
 		Variant::get_constants_for_type(type, &constants);
 
 		if (constants.size() == 0) {
-			property.usage = 0;
+			property.usage = PROPERTY_USAGE_NONE;
 			return;
 		}
 		property.hint_string = "";

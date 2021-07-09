@@ -31,6 +31,7 @@
 #ifndef OBJECT_H
 #define OBJECT_H
 
+#include "core/extension/gdnative_interface.h"
 #include "core/object/object_id.h"
 #include "core/os/rw_lock.h"
 #include "core/os/spin_lock.h"
@@ -57,8 +58,7 @@
 
 enum PropertyHint {
 	PROPERTY_HINT_NONE, ///< no hint provided.
-	PROPERTY_HINT_RANGE, ///< hint_text = "min,max,step,slider; //slider is optional"
-	PROPERTY_HINT_EXP_RANGE, ///< hint_text = "min,max,step", exponential edit
+	PROPERTY_HINT_RANGE, ///< hint_text = "min,max[,step][,or_greater][,or_lesser][,noslider][,radians][,degrees][,exp][,suffix:<keyword>] range.
 	PROPERTY_HINT_ENUM, ///< hint_text= "val1,val2,val3,etc"
 	PROPERTY_HINT_EXP_EASING, /// exponential easing function (Math::ease) use "attenuation" hint string to revert (flip h), "full" to also include in/out. (ie: "attenuation,inout")
 	PROPERTY_HINT_LENGTH, ///< hint_text= "length" (as integer)
@@ -151,7 +151,7 @@ struct PropertyInfo {
 	String hint_string;
 	uint32_t usage = PROPERTY_USAGE_DEFAULT;
 
-	_FORCE_INLINE_ PropertyInfo added_usage(int p_fl) const {
+	_FORCE_INLINE_ PropertyInfo added_usage(uint32_t p_fl) const {
 		PropertyInfo pi = *this;
 		pi.usage |= p_fl;
 		return pi;
@@ -163,7 +163,7 @@ struct PropertyInfo {
 
 	PropertyInfo() {}
 
-	PropertyInfo(Variant::Type p_type, const String p_name, PropertyHint p_hint = PROPERTY_HINT_NONE, const String &p_hint_string = "", uint32_t p_usage = PROPERTY_USAGE_DEFAULT, const StringName &p_class_name = StringName()) :
+	PropertyInfo(const Variant::Type p_type, const String p_name, const PropertyHint p_hint = PROPERTY_HINT_NONE, const String &p_hint_string = "", const uint32_t p_usage = PROPERTY_USAGE_DEFAULT, const StringName &p_class_name = StringName()) :
 			type(p_type),
 			name(p_name),
 			hint(p_hint),
@@ -244,29 +244,18 @@ class MethodBind;
 
 struct ObjectNativeExtension {
 	ObjectNativeExtension *parent = nullptr;
+	List<ObjectNativeExtension *> children;
 	StringName parent_class_name;
 	StringName class_name;
 	bool editor_class = false;
-	bool (*set)(void *instance, const void *name, const void *value) = nullptr;
-	bool (*get)(void *instance, const void *name, void *ret_variant) = nullptr;
-	struct PInfo {
-		uint32_t type;
-		const char *name;
-		const char *class_name;
-		uint32_t hint;
-		const char *hint_string;
-		uint32_t usage;
-	};
-	const PInfo *(*get_property_list)(void *instance, uint32_t *count) = nullptr;
-	void (*free_property_list)(void *instance, const PInfo *) = nullptr;
-
-	//call is not used, as all methods registered in ClassDB
-
-	void (*notification)(void *instance, int32_t what) = nullptr;
-	const char *(*to_string)(void *instance) = nullptr;
-
-	void (*reference)(void *instance) = nullptr;
-	void (*unreference)(void *instance) = nullptr;
+	GDNativeExtensionClassSet set;
+	GDNativeExtensionClassGet get;
+	GDNativeExtensionClassGetPropertyList get_property_list;
+	GDNativeExtensionClassFreePropertyList free_property_list;
+	GDNativeExtensionClassNotification notification;
+	GDNativeExtensionClassToString to_string;
+	GDNativeExtensionClassReference reference;
+	GDNativeExtensionClassReference unreference;
 
 	_FORCE_INLINE_ bool is_class(const String &p_class) const {
 		const ObjectNativeExtension *e = this;
@@ -278,10 +267,15 @@ struct ObjectNativeExtension {
 		}
 		return false;
 	}
-	void *create_instance_userdata = nullptr;
-	void *(*create_instance)(void *create_instance_userdata) = nullptr;
-	void (*free_instance)(void *create_instance_userdata, void *instance) = nullptr;
+	void *class_userdata = nullptr;
+
+	GDNativeExtensionClassCreateInstance create_instance;
+	GDNativeExtensionClassFreeInstance free_instance;
+	GDNativeExtensionClassGetVirtual get_virtual;
 };
+
+#define GDVIRTUAL_CALL(m_name, ...) _gdvirtual_##m_name##_call(__VA_ARGS__)
+#define GDVIRTUAL_BIND(m_name) ClassDB::add_virtual_method(get_class_static(), _gdvirtual_##m_name##_get_method_info());
 
 /*
    the following is an incomprehensible blob of hacks and workarounds to compensate for many of the fallencies in C++. As a plus, this macro pretty much alone defines the object model.
@@ -497,7 +491,7 @@ private:
 	friend void postinitialize_handler(Object *);
 
 	ObjectNativeExtension *_extension = nullptr;
-	void *_extension_instance = nullptr;
+	GDExtensionClassInstancePtr _extension_instance = nullptr;
 
 	struct SignalData {
 		struct Slot {
@@ -554,8 +548,9 @@ private:
 	Object(bool p_reference);
 
 protected:
+	friend class NativeExtensionMethodBind;
 	_ALWAYS_INLINE_ const ObjectNativeExtension *_get_extension() const { return _extension; }
-	_ALWAYS_INLINE_ void *_get_extension_instance() const { return _extension_instance; }
+	_ALWAYS_INLINE_ GDExtensionClassInstancePtr _get_extension_instance() const { return _extension_instance; }
 	virtual void _initialize_classv() { initialize_class(); }
 	virtual bool _setv(const StringName &p_name, const Variant &p_property) { return false; };
 	virtual bool _getv(const StringName &p_name, Variant &r_property) const { return false; };

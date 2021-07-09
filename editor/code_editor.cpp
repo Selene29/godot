@@ -105,6 +105,11 @@ void FindReplaceBar::_notification(int p_what) {
 		hide_button->set_custom_minimum_size(hide_button->get_normal_texture()->get_size());
 	} else if (p_what == NOTIFICATION_THEME_CHANGED) {
 		matches_label->add_theme_color_override("font_color", results_count > 0 ? get_theme_color("font_color", "Label") : get_theme_color("error_color", "Editor"));
+	} else if (p_what == NOTIFICATION_PREDELETE) {
+		if (base_text_editor) {
+			base_text_editor->remove_find_replace_bar();
+			base_text_editor = nullptr;
+		}
 	}
 }
 
@@ -117,7 +122,7 @@ void FindReplaceBar::_unhandled_input(const Ref<InputEvent> &p_event) {
 	}
 
 	Control *focus_owner = get_focus_owner();
-	if (text_editor->has_focus() || (focus_owner && vbc_lineedit->is_a_parent_of(focus_owner))) {
+	if (text_editor->has_focus() || (focus_owner && vbc_lineedit->is_ancestor_of(focus_owner))) {
 		bool accepted = true;
 
 		switch (k->get_keycode()) {
@@ -595,6 +600,10 @@ void FindReplaceBar::set_text_edit(CodeTextEditor *p_text_editor) {
 		text_editor = nullptr;
 	}
 
+	if (!p_text_editor) {
+		return;
+	}
+
 	results_count = -1;
 	base_text_editor = p_text_editor;
 	text_editor = base_text_editor->get_text_editor();
@@ -729,8 +738,8 @@ void CodeTextEditor::_input(const Ref<InputEvent> &event) {
 		accept_event();
 		return;
 	}
-	if (ED_IS_SHORTCUT("script_text_editor/clone_down", key_event)) {
-		clone_lines_down();
+	if (ED_IS_SHORTCUT("script_text_editor/duplicate_selection", key_event)) {
+		duplicate_selection();
 		accept_event();
 		return;
 	}
@@ -1278,7 +1287,7 @@ void CodeTextEditor::delete_lines() {
 	text_editor->end_complex_operation();
 }
 
-void CodeTextEditor::clone_lines_down() {
+void CodeTextEditor::duplicate_selection() {
 	const int cursor_column = text_editor->cursor_get_column();
 	int from_line = text_editor->cursor_get_line();
 	int to_line = text_editor->cursor_get_line();
@@ -1666,6 +1675,11 @@ void CodeTextEditor::_notification(int p_what) {
 				update_toggle_scripts_button();
 			}
 			set_process_input(is_visible_in_tree());
+		} break;
+		case NOTIFICATION_PREDELETE: {
+			if (find_replace_bar) {
+				find_replace_bar->set_text_edit(nullptr);
+			}
 		} break;
 		default:
 			break;

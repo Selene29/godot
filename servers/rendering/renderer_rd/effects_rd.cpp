@@ -37,21 +37,6 @@
 #include "servers/rendering/renderer_rd/renderer_compositor_rd.h"
 #include "thirdparty/misc/cubemap_coeffs.h"
 
-static _FORCE_INLINE_ void store_transform_3x3(const Basis &p_basis, float *p_array) {
-	p_array[0] = p_basis.elements[0][0];
-	p_array[1] = p_basis.elements[1][0];
-	p_array[2] = p_basis.elements[2][0];
-	p_array[3] = 0;
-	p_array[4] = p_basis.elements[0][1];
-	p_array[5] = p_basis.elements[1][1];
-	p_array[6] = p_basis.elements[2][1];
-	p_array[7] = 0;
-	p_array[8] = p_basis.elements[0][2];
-	p_array[9] = p_basis.elements[1][2];
-	p_array[10] = p_basis.elements[2][2];
-	p_array[11] = 0;
-}
-
 static _FORCE_INLINE_ void store_camera(const CameraMatrix &p_mtx, float *p_array) {
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 4; j++) {
@@ -518,11 +503,10 @@ void EffectsRD::screen_space_reflection(RID p_diffuse, RID p_normal_roughness, R
 
 		if (p_roughness_quality != RS::ENV_SSR_ROUGNESS_QUALITY_DISABLED) {
 			RD::get_singleton()->compute_list_bind_uniform_set(compute_list, _get_compute_uniform_set_from_image_pair(p_output, p_blur_radius), 1);
-			RD::get_singleton()->compute_list_bind_uniform_set(compute_list, _get_compute_uniform_set_from_texture_pair(p_metallic, p_normal_roughness), 3);
 		} else {
 			RD::get_singleton()->compute_list_bind_uniform_set(compute_list, _get_uniform_set_from_image(p_output), 1);
-			RD::get_singleton()->compute_list_bind_uniform_set(compute_list, _get_compute_uniform_set_from_texture(p_metallic), 3);
 		}
+		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, _get_compute_uniform_set_from_texture(p_metallic), 3);
 		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, _get_uniform_set_from_image(p_scale_normal), 2);
 
 		RD::get_singleton()->compute_list_dispatch_threads(compute_list, p_screen_size.width, p_screen_size.height, 1);
@@ -1371,45 +1355,6 @@ void EffectsRD::cubemap_filter(RID p_source_cubemap, Vector<RID> p_dest_cubemap,
 	RD::get_singleton()->compute_list_end();
 }
 
-void EffectsRD::render_sky(RD::DrawListID p_list, float p_time, RID p_fb, RID p_samplers, RID p_fog, PipelineCacheRD *p_pipeline, RID p_uniform_set, RID p_texture_set, uint32_t p_view_count, const CameraMatrix *p_projections, const Basis &p_orientation, float p_multiplier, const Vector3 &p_position) {
-	SkyPushConstant sky_push_constant;
-
-	memset(&sky_push_constant, 0, sizeof(SkyPushConstant));
-
-	for (uint32_t v = 0; v < p_view_count; v++) {
-		// We only need key components of our projection matrix
-		sky_push_constant.projections[v][0] = p_projections[v].matrix[2][0];
-		sky_push_constant.projections[v][1] = p_projections[v].matrix[0][0];
-		sky_push_constant.projections[v][2] = p_projections[v].matrix[2][1];
-		sky_push_constant.projections[v][3] = p_projections[v].matrix[1][1];
-	}
-	sky_push_constant.position[0] = p_position.x;
-	sky_push_constant.position[1] = p_position.y;
-	sky_push_constant.position[2] = p_position.z;
-	sky_push_constant.multiplier = p_multiplier;
-	sky_push_constant.time = p_time;
-	store_transform_3x3(p_orientation, sky_push_constant.orientation);
-
-	RenderingDevice::FramebufferFormatID fb_format = RD::get_singleton()->framebuffer_get_format(p_fb);
-
-	RD::DrawListID draw_list = p_list;
-
-	RD::get_singleton()->draw_list_bind_render_pipeline(draw_list, p_pipeline->get_render_pipeline(RD::INVALID_ID, fb_format));
-
-	RD::get_singleton()->draw_list_bind_uniform_set(draw_list, p_samplers, 0);
-	if (p_uniform_set.is_valid()) { //material may not have uniform set
-		RD::get_singleton()->draw_list_bind_uniform_set(draw_list, p_uniform_set, 1);
-	}
-	RD::get_singleton()->draw_list_bind_uniform_set(draw_list, p_texture_set, 2);
-	RD::get_singleton()->draw_list_bind_uniform_set(draw_list, p_fog, 3);
-
-	RD::get_singleton()->draw_list_bind_index_array(draw_list, index_array);
-
-	RD::get_singleton()->draw_list_set_push_constant(draw_list, &sky_push_constant, sizeof(SkyPushConstant));
-
-	RD::get_singleton()->draw_list_draw(draw_list, true);
-}
-
 void EffectsRD::resolve_gi(RID p_source_depth, RID p_source_normal_roughness, RID p_source_voxel_gi, RID p_dest_depth, RID p_dest_normal_roughness, RID p_dest_voxel_gi, Vector2i p_screen_size, int p_samples, uint32_t p_barrier) {
 	ResolvePushConstant push_constant;
 	push_constant.screen_size[0] = p_screen_size.x;
@@ -1424,6 +1369,24 @@ void EffectsRD::resolve_gi(RID p_source_depth, RID p_source_normal_roughness, RI
 		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, _get_compute_uniform_set_from_texture(p_source_voxel_gi), 2);
 		RD::get_singleton()->compute_list_bind_uniform_set(compute_list, _get_uniform_set_from_image(p_dest_voxel_gi), 3);
 	}
+
+	RD::get_singleton()->compute_list_set_push_constant(compute_list, &push_constant, sizeof(ResolvePushConstant));
+
+	RD::get_singleton()->compute_list_dispatch_threads(compute_list, p_screen_size.x, p_screen_size.y, 1);
+
+	RD::get_singleton()->compute_list_end(p_barrier);
+}
+
+void EffectsRD::resolve_depth(RID p_source_depth, RID p_dest_depth, Vector2i p_screen_size, int p_samples, uint32_t p_barrier) {
+	ResolvePushConstant push_constant;
+	push_constant.screen_size[0] = p_screen_size.x;
+	push_constant.screen_size[1] = p_screen_size.y;
+	push_constant.samples = p_samples;
+
+	RD::ComputeListID compute_list = RD::get_singleton()->compute_list_begin();
+	RD::get_singleton()->compute_list_bind_compute_pipeline(compute_list, resolve.pipelines[RESOLVE_MODE_DEPTH]);
+	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, _get_compute_uniform_set_from_texture(p_source_depth), 0);
+	RD::get_singleton()->compute_list_bind_uniform_set(compute_list, _get_uniform_set_from_image(p_dest_depth), 1);
 
 	RD::get_singleton()->compute_list_set_push_constant(compute_list, &push_constant, sizeof(ResolvePushConstant));
 
@@ -1934,6 +1897,7 @@ EffectsRD::EffectsRD() {
 		Vector<String> resolve_modes;
 		resolve_modes.push_back("\n#define MODE_RESOLVE_GI\n");
 		resolve_modes.push_back("\n#define MODE_RESOLVE_GI\n#define VOXEL_GI_RESOLVE\n");
+		resolve_modes.push_back("\n#define MODE_RESOLVE_DEPTH\n");
 
 		resolve.shader.initialize(resolve_modes);
 

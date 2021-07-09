@@ -1,5 +1,5 @@
 /*************************************************************************/
-/*  http_client.h.inc                                                    */
+/*  register_types.cpp                                                   */
 /*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
@@ -28,24 +28,47 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
 
-// HTTPClient's additional private members in the javascript platform
+#include "register_types.h"
 
-Error make_request(Method p_method, const String &p_url, const Vector<String> &p_headers, const uint8_t *p_body, int p_body_len);
-static void _parse_headers(int p_len, const char **p_headers, void *p_ref);
+#include "core/config/engine.h"
+#include "servers/navigation_server_3d.h"
 
-int js_id = 0;
-// 64 KiB by default (favors fast download speeds at the cost of memory usage).
-int read_limit = 65536;
-Status status = STATUS_DISCONNECTED;
+#include "godot_navigation_server.h"
 
-String host;
-int port = -1;
-bool use_tls = false;
-
-int polled_response_code = 0;
-Vector<String> response_headers;
-Vector<uint8_t> response_buffer;
-
-#ifdef DEBUG_ENABLED
-uint64_t last_polling_frame = 0;
+#ifndef _3D_DISABLED
+#include "navigation_mesh_generator.h"
 #endif
+
+#ifdef TOOLS_ENABLED
+#include "navigation_mesh_editor_plugin.h"
+#endif
+
+#ifndef _3D_DISABLED
+NavigationMeshGenerator *_nav_mesh_generator = nullptr;
+#endif
+
+NavigationServer3D *new_server() {
+	return memnew(GodotNavigationServer);
+}
+
+void register_navigation_types() {
+	NavigationServer3DManager::set_default_server(new_server);
+
+#ifndef _3D_DISABLED
+	_nav_mesh_generator = memnew(NavigationMeshGenerator);
+	ClassDB::register_class<NavigationMeshGenerator>();
+	Engine::get_singleton()->add_singleton(Engine::Singleton("NavigationMeshGenerator", NavigationMeshGenerator::get_singleton()));
+#endif
+
+#ifdef TOOLS_ENABLED
+	EditorPlugins::add_by_type<NavigationMeshEditorPlugin>();
+#endif
+}
+
+void unregister_navigation_types() {
+#ifndef _3D_DISABLED
+	if (_nav_mesh_generator) {
+		memdelete(_nav_mesh_generator);
+	}
+#endif
+}
